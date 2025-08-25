@@ -1946,6 +1946,15 @@ let cmp = lanceCompare(topOur, topRiv, opts);
     if(pairs.length>=1 && pairs[0].n===2) return "simples";
     return "ninguno";
   }
+  function isJuegoBetterOrEqual(score, threshold) {
+    if (score < 31) return false;
+    const order = [31, 32, 40, 39, 38, 37, 36, 35, 34, 33];
+    const scoreRank = order.indexOf(score);
+    const thresholdRank = order.indexOf(threshold);
+    if (scoreRank === -1) return false; // Not a valid juego score
+    if (thresholdRank === -1) return true; // Any juego is better than an invalid threshold
+    return scoreRank <= thresholdRank; // Lower index is better
+  }
   // Thresholds from the summary table
   const RULES = {
     grande: {
@@ -2025,7 +2034,7 @@ let cmp = lanceCompare(topOur, topRiv, opts);
       const scen = RULES.juego[esc]; if(!scen || !scen[bet]){ say('Sin regla'); return; }
       const need = mano? scen[bet].mano : scen[bet].postre;
       const total = sumJuego(hand);
-      const ok = total>=need && total>=31;
+      const ok = isJuegoBetterOrEqual(total, need);
       say(ok? 'QUERER' : 'NO querer', 'Total juego='+total+'; umbral='+need);
       return;
     }
