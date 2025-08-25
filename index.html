@@ -1224,37 +1224,27 @@ let cmp = lanceCompare(topOur, topRiv, opts);
   function whoCuts(){ return (document.getElementById("sc-who")?document.getElementById("sc-who").value:"") || "none"; }
 
   function adviseByProb(prob, esMano, sc, who){
-    // Base thresholds
-    let TH_ORDAGO = 0.85, TH_FUERTE = 0.70, TH_ENVIDA = 0.60;
-    // Mano un pelín más agresiva
-    if (esMano) { TH_ORDAGO -= 0.02; TH_FUERTE -= 0.02; TH_ENVIDA -= 0.02; }
-
-    // Ajustes por quién corta y tanteo
-    const advDiff = sc.us - sc.th; // positivo si vamos por delante
-    if (who === 'them'){
-      // Si cortan ellos, asumimos mano fuerte => sube umbrales
-      let bump = 0.05;
-      if (sc.th >= 35) bump += 0.05;
-      if ((sc.th - sc.us) >= 10) bump += 0.05;
-      bump = Math.min(bump, 0.15);
-      TH_ORDAGO += bump; TH_FUERTE += bump; TH_ENVIDA += bump;
-    } else if (who === 'us'){
-      // Si cortamos nosotros, queremos cerrar: baja umbrales si vamos por delante
-      let drop = 0.02;
-      if (sc.us >= 35) drop += 0.03;
-      if (advDiff >= 10) drop += 0.03;
-      drop = Math.min(drop, 0.10);
-      TH_ORDAGO -= drop; TH_FUERTE -= drop; TH_ENVIDA -= drop;
+    // Reglas Gil simplificadas: tamaños 2/5/10 y órdago
+    let TH_2 = 0.58, TH_5 = 0.66, TH_10 = 0.74, TH_ORD = 0.85;
+    if (esMano){ TH_2 -= 0.01; TH_5 -= 0.015; TH_10 -= 0.02; TH_ORD -= 0.02; }
+    const advDiff = sc.us - sc.th, adentroUs = sc.us >= 35, adentroTh = sc.th >= 35;
+    if (who === 'them'){ let b=0.04; if (adentroTh) b+=0.03; if ((sc.th-sc.us)>=10) b+=0.03; b=Math.min(b,0.12);
+      TH_2+=b; TH_5+=b; TH_10+=b; TH_ORD+=b;
+    } else if (who === 'us'){ let d=0.02; if (adentroUs) d+=0.03; if (advDiff>=10) d+=0.02; d=Math.min(d,0.08);
+      TH_2-=d; TH_5-=d; TH_10-=d; TH_ORD-=d;
     }
-
-    // Clamp
-    const clamp = (x)=>Math.max(0.40, Math.min(0.95, x));
-    TH_ORDAGO = clamp(TH_ORDAGO); TH_FUERTE = clamp(TH_FUERTE); TH_ENVIDA = clamp(TH_ENVIDA);
-
-    if (prob >= TH_ORDAGO) return { advise: "Órdago", reason: `Prob. ${(prob*100).toFixed(0)}% (umbral ${Math.round(TH_ORDAGO*100)}%).` };
-    if (prob >= TH_FUERTE) return { advise: "Envida fuerte", reason: `Prob. ${(prob*100).toFixed(0)}% (umbral ${Math.round(TH_FUERTE*100)}%).` };
-    if (prob >= TH_ENVIDA) return { advise: "Envida", reason: `Prob. ${(prob*100).toFixed(0)}% (umbral ${Math.round(TH_ENVIDA*100)}%).` };
-    return { advise: "Pasa", reason: `Prob. ${(prob*100).toFixed(0)}% (< ${Math.round(TH_ENVIDA*100)}%).` };
+    const clamp=x=>Math.max(0.40,Math.min(0.95,x));
+    TH_2=clamp(TH_2); TH_5=clamp(TH_5); TH_10=clamp(TH_10); TH_ORD=clamp(TH_ORD);
+    let advise="Pasa", reason="", stake=0;
+    if (prob>=TH_ORD){ advise="Órdago"; reason=`Prob. ${(prob*100).toFixed(0)}% ≥ ${(TH_ORD*100).toFixed(0)}%.`; }
+    else if (prob>=TH_10){ advise="Envida 10"; stake=10; reason=`Prob. ${(prob*100).toFixed(0)}% ≥ ${(TH_10*100).toFixed(0)}%.`; }
+    else if (prob>=TH_5){ advise="Envida 5"; stake=5; reason=`Prob. ${(prob*100).toFixed(0)}% ≥ ${(TH_5*100).toFixed(0)}%.`; }
+    else if (prob>=TH_2){ advise="Envida 2"; stake=2; reason=`Prob. ${(prob*100).toFixed(0)}% ≥ ${(TH_2*100).toFixed(0)}%.`; }
+    else { advise="Pasa"; reason=`Prob. ${(prob*100).toFixed(0)}% < ${(TH_2*100).toFixed(0)}%.`; }
+    // Empuje si vas muy detrás, freno si estás adentro y por delante
+    if ((sc.th-sc.us)>=15 && stake>0 && advise!=="Órdago"){ stake = Math.min(10, stake===2?5:10); advise = stake===10?"Envida 10":"Envida 5"; reason += " Vas muy detrás: +1."; }
+    if (adentroUs && advDiff>=5 && stake>0){ stake = Math.max(2, stake===10?5:2); advise = stake===5?"Envida 5":"Envida 2"; reason += " Adentro y por delante: -1."; }
+    return { advise, reason, stake, thresholds:{TH_2,TH_5,TH_10,TH_ORD} };
   }
 
   window.generarRecomendaciones = function(probs, esMano){
@@ -1302,6 +1292,12 @@ let cmp = lanceCompare(topOur, topRiv, opts);
         const reasonEl = entry.card.querySelector('.reason');
         if (adviseEl) adviseEl.textContent = advice.advise;
         if (reasonEl) reasonEl.textContent = advice.reason + (who==='them' ? " Rival ha cortado: asume fuerza." : who==='us' ? " Buscamos cerrar sin regalar desc." : "");
+
+        // Muestra tamaño del envite sugerido
+        const stakeBadge = entry.card.querySelector('.stake-badge') || (function(){
+          const el=document.createElement('div'); el.className='tip muted sm stake-badge'; entry.card.appendChild(el); return el;
+        })();
+        stakeBadge.textContent = advice.stake ? `Tamaño sugerido: ${advice.stake}` : `Tamaño sugerido: 0`;
       });
     } catch(e){ /* no-op */ }
   };
@@ -2152,6 +2148,36 @@ let cmp = lanceCompare(topOur, topRiv, opts);
   const compJuego  = (a,b,o)=>window.compJuego ? window.compJuego(a,b,o) : 0;
 
   window.teamWins = function(lanceCompare, myHand, opts){
+    // Helpers for conditioning by 'corte' and tanteo
+    function juegoSum(h){ const val={"R":10,"3":10,"C":10,"S":10,"7":7,"6":6,"5":5,"4":4,"A":1,"2":1}; return h.reduce((a,c)=>a+(val[c]||0),0); }
+    function countRanks(h){ const m={}; h.forEach(c=>m[c]=(m[c]||0)+1); return m; }
+    function hasPairOrBetter(h){ const m=countRanks(h); return Object.values(m).some(v=>v>=2); }
+    function isCutWorthy(h, lance, usAm, thAm){
+      const m=countRanks(h);
+      const sum=juegoSum(h);
+      const nearWinThem = thAm>=6;
+      const behindThem  = thAm+usAm<8 && thAm<usAm;
+      if(lance==="grande"){
+        const hi = (m["R"]||0)+(m["3"]||0)+(m["C"]||0)+(m["S"]||0);
+        if(hi>=3) return true;
+        if((m["R"]||0)>=2) return true;
+        if(sum>=39) return true;
+        if(behindThem && (hi>=2 || hasPairOrBetter(h))) return true;
+        return false;
+      } else if(lance==="pares"){
+        if(hasPairOrBetter(h)) return true;
+        return false;
+      } else if(lance==="juego"){
+        if(sum>=31) return true;
+        if(nearWinThem && sum>=29) return true;
+        return false;
+      } else { // chica
+        const lows=(h.filter(c=>c==="A"||c==="2"||c==="4").length);
+        if(lows>=3 && !hasPairOrBetter(h)) return true;
+        return false;
+      }
+    }
+
     const iters = opts.iters||20000;
     const mano  = !!opts.mano;
 
@@ -2167,6 +2193,13 @@ let cmp = lanceCompare(topOur, topRiv, opts);
 
     const strategyComp = opts.discardStrategy || "pdf";
     const strategyRiv  = 'pdf';
+
+    const lanceTag = (function(lc){
+      if(lc===window.compGrande) return 'grande';
+      if(lc===window.compChica ) return 'chica';
+      if(lc===window.compPares ) return 'pares';
+      return 'juego';
+    })(lanceCompare);
 
     let wins=0, ties=0;
     for(let t=0;t<iters;t++){
@@ -2185,10 +2218,40 @@ let cmp = lanceCompare(topOur, topRiv, opts);
       let op2  = hubo ? draw4WithBiasedKings(deck, keptOp2 , P_KEEP_IS_KING) : drawRandom(deck,4);
 
       // Aplicar descartes y robar
-      comp = applyDD(comp, deck, dComp, strategyComp,   lanceTag(lanceCompare), {mano:false});
-      op1  = applyDD(op1 , deck, dOp1 , strategyRiv ,   lanceTag(lanceCompare), {mano:false});
-      op2  = applyDD(op2 , deck, dOp2 , strategyRiv ,   lanceTag(lanceCompare), {mano:false});
+      comp = applyDD(comp, deck, dComp, strategyComp,   lanceTag, {mano:false});
+      op1  = applyDD(op1 , deck, dOp1 , strategyRiv ,   lanceTag, {mano:false});
+      op2  = applyDD(op2 , deck, dOp2 , strategyRiv ,   lanceTag, {mano:false});
 
+      // Condicionar por quién corta mus
+      if (opts.cutWho === 'them') {
+        let safety=0;
+        while(safety++<200 && !((opts.hadMus==='yes'
+            ? ( (function(){ const r12 = lanceCompare(op1, op2, opts); const topR = (r12>=0)? op1 : op2; return isCutWorthy(topR, lanceTag, opts.usAm||0, opts.thAm||0); })() )
+            : (isCutWorthy(op1, lanceTag, opts.usAm||0, opts.thAm||0) || isCutWorthy(op2, lanceTag, opts.usAm||0, opts.thAm||0))
+          ))){
+          let deck2 = deck40();
+          const used = myHand.concat(comp);
+          used.forEach(c=>{ const k=deck2.indexOf(c); if(k>=0) deck2.splice(k,1); });
+          discardsMine.forEach(c=>{ const k=deck2.indexOf(c); if(k>=0) deck2.splice(k,1); });
+          op1 = hubo ? draw4WithBiasedKings(deck2, Math.max(0, 4 - dOp1), P_KEEP_IS_KING) : drawRandom(deck2,4);
+          op2 = hubo ? draw4WithBiasedKings(deck2, Math.max(0, 4 - dOp2), P_KEEP_IS_KING) : drawRandom(deck2,4);
+          op1  = applyDD(op1 , deck2, dOp1 , strategyRiv, lanceTag, {mano:false});
+          op2  = applyDD(op2 , deck2, dOp2 , strategyRiv, lanceTag, {mano:false});
+        }
+      }
+      // Si cortamos nosotros, sesgar al compañero a mano fuerte en el lance actual
+      if (opts.cutWho === 'us') {
+        let safety2 = 0;
+        while (safety2++ < 200 && !isCutWorthy(comp, lanceTag, opts.usAm||0, opts.thAm||0)) {
+          let deck2 = deck40();
+          const used2 = myHand.slice();
+          used2.forEach(c => { const k = deck2.indexOf(c); if (k >= 0) deck2.splice(k,1); });
+          const keptComp2 = Math.max(0, 4 - dComp);
+          comp = hubo ? draw4WithBiasedKings(deck2, keptComp2, P_KEEP_IS_KING) : drawRandom(deck2,4);
+          comp = applyDD(comp, deck2, dComp, strategyComp, lanceTag, {mano:false});
+        }
+      }
+      
       // Elegir mejor de cada pareja
       const c12 = lanceCompare(comp, myHand, opts);
       const topOur = (c12>=0) ? comp : myHand;
@@ -2201,13 +2264,6 @@ let cmp = lanceCompare(topOur, topRiv, opts);
     }
     return wins/iters;
   };
-
-  function lanceTag(lc){
-    if(lc===window.compGrande) return 'grande';
-    if(lc===window.compChica ) return 'chica';
-    if(lc===window.compPares ) return 'pares';
-    return 'juego';
-  }
 
   // Hook: re-ejecutar al cambiar "¿Hubo descartes?"
   document.getElementById('mc-hubo')?.addEventListener('change', ()=>{
