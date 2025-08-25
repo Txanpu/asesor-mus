@@ -1,0 +1,2046 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Asesor de Mus — qué hacer con mis cartas</title>
+<style>
+    :root{--bg:#0f1115;--card:#151821;--muted:#9aa4b2;--fg:#e6e9ee;--accent:#8b5cf6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;letter-spacing:.1px;background:linear-gradient(180deg,#0f1115,#0e1014);color:var(--fg)}
+    .wrap{max-width:1100px;margin:32px auto;padding:0 16px}
+    header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:16px}
+    h1{font-size:20px;margin:0;font-weight:700;letter-spacing:.2px}
+    .card{background:var(--card);border:1px solid #232738;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:16px}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+    .g-6{grid-column:span 6}
+    .g-12{grid-column:span 12}
+    .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+    select,button,input[type="checkbox"]{appearance:none}
+    select,button{border-radius:12px;border:1px solid #2a3042;background:#101320;color:var(--fg);padding:10px 12px;font-size:14px}
+    select:focus,button:focus{outline:2px solid var(--accent);outline-offset:2px}
+    button.primary{background:var(--accent);border-color:transparent;color:white;font-weight:700}
+    button.ghost{background:#101320}
+    button.small{padding:6px 10px;font-size:12px}
+    .pill{border:1px dashed #2a3042;color:#cbd5e1;border-radius:999px;padding:6px 10px;cursor:pointer;user-select:none}
+    .pill:hover{border-color:#3b4260}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .tip{font-size:12px;color:#a3adc2}
+    .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 8px;font-size:12px;background:#0f1322;border:1px solid #28304a;color:#cbd5e1}
+    .badge.toggle{cursor:pointer;transition:background .2s,border-color .2s,color .2s}
+    .badge.toggle.on{background:rgba(34,197,94,.15);border-color:var(--ok);color:#d1fae5}
+    .badge.toggle.off{background:rgba(239,68,68,.12);border-color:var(--bad);color:#fee2e2}
+    .kpi{display:flex;gap:8px;align-items:baseline}
+    .kpi b{font-size:18px}
+    .tag{padding:2px 6px;border-radius:6px;font-size:11px;border:1px solid #2a3042;color:#cbd5e1}
+    .ok{color:#22c55e}.warn{color:#f59e0b}.bad{color:#ef4444}
+    .section-title{font-weight:800;letter-spacing:.3px;margin:8px 0 6px}
+    .divider{height:1px;background:#22283a;margin:8px 0}
+    details{background:#101420;border:1px solid #21283b;border-radius:12px;padding:10px}
+    summary{cursor:pointer;color:#cbd5e1}
+    ul{margin:6px 0 0 18px}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+  
+  /* === PROBABILIDADES & SIMULADOR (inyectado) === */
+  .prob-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;margin-top:8px}
+  .prob-col-4{grid-column:span 4}
+  .kpi .sub{font-size:11px;color:var(--muted)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+  .muted{color:var(--muted)}
+  .sm{font-size:12px}
+  .range{width:180px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1>Asesor de Mus <span class="tag">single‑file</span></h1>
+<div class="row">
+<span class="badge toggle off" id="tg31" title="Regla opcional">
+<input id="opt31real" style="display:none" type="checkbox"/>
+<span class="label">31 real: NO</span>
+</span>
+<span class="badge toggle off" id="tgMano">
+<input id="optMano" style="display:none" type="checkbox"/>
+<span class="label">Soy mano: NO</span>
+</span>
+<button class="primary" id="calc-all">Calcular todo</button></div>
+</header>
+<div class="card">
+<div class="section-title">Probabilidades base (mus 8 reyes / 8 ases)</div>
+<div class="prob-grid">
+<div class="prob-col-4">
+<div class="kpi"><b id="kpi-pares">—</b><span class="sub">% manos con <span class="mono">Pares</span></span></div>
+<div class="tip muted sm">Incluye par, medias y duples. Cálculo exacto sobre 91.390 manos posibles.</div>
+</div>
+<div class="prob-col-4">
+<div class="kpi"><b id="kpi-juego">—</b><span class="sub">% manos con <span class="mono">Juego</span></span></div>
+<div class="tip muted sm">31 o más. La <span class="mono">31</span> aparece ~9% del total.</div>
+</div>
+<div class="prob-col-4">
+<div class="kpi"><b id="kpi-punto30">—</b><span class="sub">% de manos <span class="mono">al punto</span> que son 30</span></div>
+<div class="tip muted sm">Dentro de las manos sin juego.</div>
+</div>
+</div>
+<div class="divider"></div>
+<details>
+<summary>Desglose rápido</summary>
+<ul class="sm">
+<li><span class="mono">Duples</span>: <span id="kpi-duples">—</span>% • <span class="mono">Medias</span>: <span id="kpi-medias">—</span>% • <span class="mono">Par</span>: <span id="kpi-par">—</span>%.</li>
+<li><span class="mono">31</span> con pares: <span id="kpi-31-con-pares">—</span> %  • <span class="mono">31</span> sin pares: <span id="kpi-31-sin-pares">—</span>%.</li>
+<li class="muted">Fuentes: conteos combinatorios clásicos (91.390 manos) y artículos técnicos de mus.</li>
+</ul>
+</details>
+</div><div class="card"><h3 style="margin:0 0 8px 0;font-size:14px;color:#cbd5e1;font-weight:700;">Tanteo</h3><div class="row"><div><label>Nosotros</label><div class="controls"><select id="sc-us-am"><option value="0">0 hamarrekos</option><option value="1">1 hamarrekos</option><option value="2">2 hamarrekos</option><option value="3">3 hamarrekos</option><option value="4">4 hamarrekos</option><option value="5">5 hamarrekos</option><option value="6">6 hamarrekos</option><option value="7">7 hamarrekos</option></select><select id="sc-us-pi"><option value="0">0 pitas</option><option value="1">1 pitas</option><option value="2">2 pitas</option><option value="3">3 pitas</option><option value="4">4 pitas</option></select></div></div><div><label>Ellos</label><div class="controls"><select id="sc-th-am"><option value="0">0 hamarrekos</option><option value="1">1 hamarrekos</option><option value="2">2 hamarrekos</option><option value="3">3 hamarrekos</option><option value="4">4 hamarrekos</option><option value="5">5 hamarrekos</option><option value="6">6 hamarrekos</option><option value="7">7 hamarrekos</option></select><select id="sc-th-pi"><option value="0">0 pitas</option><option value="1">1 pitas</option><option value="2">2 pitas</option><option value="3">3 pitas</option><option value="4">4 pitas</option></select></div></div></div><div class="row"><span class="pill" id="sc-summary">0 – 0 piedras</span></div><div class="tip muted sm">Juego a 8 hamarrekos (40 piedras). “Adentro” a partir de 35 piedras.</div></div><div class="card"><h3 style="margin:0 0 8px 0;font-size:14px;color:#cbd5e1;font-weight:700;">Quién corta ahora</h3><div class="row"><div><label>Situación</label><div class="controls"><select id="sc-who"><option value="none">Nadie aún / indeciso</option><option value="us">Cortamos nosotros</option><option value="them">Cortan ellos</option></select></div></div></div><div class="tip muted sm">Si cortan ellos y van por delante, la app endurece los envites.</div></div><div class="card" style="margin-top:12px">
+<div class="section-title">Simulador de mesa (Monte Carlo)</div>
+<div class="row">
+<div>
+<label>Tus cartas (tipo)</label>
+<div class="row">
+<select id="mc-c1"><option value="">—</option></select>
+<select id="mc-c2"><option value="">—</option></select>
+<select id="mc-c3"><option value="">—</option></select>
+<select id="mc-c4"><option value="">—</option></select>
+</div>
+<div class="tip muted sm" style="margin-top:6px">Usa tipos: <span class="mono">A (As)</span>, <span class="mono">2</span>, <span class="mono">3</span>, <span class="mono">4</span>, <span class="mono">5</span>, <span class="mono">6</span>, <span class="mono">7</span>, <span class="mono">S (Sota)</span>, <span class="mono">C (Caballo)</span>, <span class="mono">R (Rey)</span>.</div>
+</div>
+<div>
+<label>Escenario</label>
+<div class="row">
+<span class="badge">Iteraciones: <input class="mono" id="mc-iters" max="1000000" min="1000" step="1000" style="width:100px;margin-left:6px" type="number" value="20000"/></span>
+</div>
+</div>
+</div>
+<!-- === DESCARTES Y CONDICIONADO === -->
+<div class="row" style="margin-top:8px">
+<div>
+<label>Mis descartes (cartas que he tirado)</label>
+<div class="row">
+<select id="mc-d1"><option value="">—</option></select>
+<select id="mc-d2"><option value="">—</option></select>
+<select id="mc-d3"><option value="">—</option></select>
+<select id="mc-d4"><option value="">—</option></select>
+</div>
+<div class="tip muted sm" style="margin-top:6px">Estas cartas quedan fuera del mazo en la simulación.</div>
+</div>
+<div>
+<label>Descartes de cada jugador (nº de cartas)</label>
+<div class="row">
+<span class="badge">Compañero: <input class="mono" id="mc-dcomp" max="4" min="0" step="1" style="width:60px;margin-left:6px" type="number" value="0"/></span>
+<span class="badge">Rival 1: <input class="mono" id="mc-dop1" max="4" min="0" step="1" style="width:60px;margin-left:6px" type="number" value="0"/></span>
+<span class="badge">Rival 2: <input class="mono" id="mc-dop2" max="4" min="0" step="1" style="width:60px;margin-left:6px" type="number" value="0"/></span>
+</div>
+<div class="row" style="margin-top:6px">
+<span class="badge">Estrategia de descarte:
+              <select class="mono" id="mc-dstrategy" style="margin-left:6px"><option value="random">aleatorio</option><option value="lance">optimizar por lance</option><option value="pdf">según PDF</option></select>
+</span>
+</div>
+</div>
+</div>
+<div class="row" style="margin-top:8px">
+<button class="primary" id="mc-run">Calcular odds rápidas</button>
+<button class="ghost small" id="mc-mus-bias" style="margin-left:6px">Decidir MUS y recalcular</button>
+<span class="tip muted sm">[Inferencia] Resultados estimados por simulación (no exactos).</span>
+</div>
+<div class="prob-grid" style="margin-top:10px">
+<div class="prob-col-4"><div class="kpi"><b id="mc-grande">—</b><span class="sub">prob. de ganar <span class="mono">Grande</span> (tu equipo)</span></div></div>
+<div class="prob-col-4"><div class="kpi"><b id="mc-chica">—</b><span class="sub">prob. de ganar <span class="mono">Chica</span> (tu equipo)</span></div></div>
+<div class="prob-col-4"><div class="kpi"><b id="mc-pares">—</b><span class="sub">prob. de ganar <span class="mono">Pares</span> (tu equipo)</span></div></div>
+<div class="prob-col-4"><div class="kpi"><b id="mc-juego">—</b><span class="sub">prob. de ganar <span class="mono">Juego/Punto</span> (tu equipo)</span></div></div>
+</div>
+<div class="tip muted sm" id="mc-note" style="margin-top:6px"></div>
+<details style="margin-top:8px">
+<summary>Notas y heurísticos</summary>
+<ul class="sm">
+<li>Con duples altos, suele interesar no entrar en guerra de grande. <span class="muted">(tratado práctico)</span></li>
+<li>“Con juego y pares, corta el mus y no te azares”. <span class="muted">(mano)</span></li>
+<li>Comparativas curiosas en Pares: A veces RR4A supera a CCC7 por bloqueo de combinaciones rivales.</li>
+</ul>
+</details>
+</div><div class="card" id="gil-discard-card">
+<div class="section-title">Descarte óptimo (según Gil)</div>
+<div class="row">
+<div class="tip muted sm">Selecciona tus 4 cartas arriba. Marca si eres mano, el objetivo y pulsa.</div>
+</div>
+<div class="row" style="margin-top:6px">
+<span class="badge toggle off" id="tgMano2">
+<input id="optMano2" style="display:none" type="checkbox"/>
+<span class="label">Soy mano: NO</span>
+</span>
+<span class="badge">Objetivo:
+      <select class="mono" id="gil-objetivo"><option value="juego">Juego</option><option value="pares">Pares</option></select>
+</span>
+<span class="badge">Descarte:
+      <select class="mono" id="gil-round"><option value="0">Primer descarte</option><option value="1">Segundo o más</option></select>
+</span>
+</div>
+<div class="row" style="margin-top:8px">
+<button class="primary" id="btn-gil-reco">Recomendar descarte</button>
+</div>
+<div class="divider"></div>
+<div class="sm" id="gil-out"></div>
+</div><div class="card" id="auto-asesor-tabla">
+<div class="section-title">Asesor automático (tabla → decisión)</div>
+<div class="tip muted sm">Selecciona tus 4 cartas arriba. Elige lance, apuesta, escenario y si eres mano. Pulsa decidir.</div>
+<div class="row" style="margin-top:6px">
+<span class="badge">Lance:
+      <select class="mono" id="aat-lance">
+<option value="grande">Grande</option>
+<option value="chica">Chica</option>
+<option value="pares">Pares</option>
+<option value="juego">Juego</option>
+<option value="punto">Punto</option>
+</select>
+</span>
+<span class="badge">Apuesta:
+      <select class="mono" id="aat-bet">
+<option value="2">2</option>
+<option value="3">3</option>
+<option value="4">4</option>
+<option value="5">5</option>
+</select>
+</span>
+<span class="badge">Escenario:
+      <select class="mono" id="aat-esc">
+<option value="1v1">1 vs 1</option>
+<option value="vs2">1 vs 2</option>
+<option value="2v1">2 vs 1</option>
+<option value="2v2">2 vs 2</option>
+<option value="todos">Todos (Punto)</option>
+</select>
+</span>
+<span class="badge toggle off" id="aat-mano-tg">
+<input id="aat-mano" style="display:none" type="checkbox"/>
+<span class="label">Soy mano: NO</span>
+</span>
+</div>
+<div class="row" style="margin-top:8px">
+<button class="primary" id="aat-decidir">Decidir</button>
+</div>
+<div class="divider"></div>
+<div class="sm" id="aat-out"></div>
+</div>
+<script>
+(function(){
+  function syncToggle(srcId, labelSel, targets){
+    const src = document.getElementById(srcId);
+    function get(){ return !!(src && src.checked); }
+    function apply(){
+      const on = get();
+      targets.forEach(t => {
+        const inp = document.getElementById(t);
+        if(inp){ inp.checked = on; }
+      });
+      const lab = document.querySelector(labelSel);
+      if(lab){ lab.textContent = on ? 'Soy mano: SÍ' : 'Soy mano: NO'; }
+    }
+    if(src){ src.addEventListener('change', apply); apply(); }
+    // Also apply once at load if no src found (noop)
+  }
+  // Hide local toggles
+  var t2 = document.getElementById('tgMano2'); if(t2) t2.style.display='none';
+  var tA = document.getElementById('aat-mano-tg'); if(tA) tA.style.display='none';
+  // Keep their inputs in sync with global
+  syncToggle('optMano', '#tgMano .label', ['optMano2','aat-mano']);
+  // Global "Calcular todo" triggers every compute button
+  function clickIf(id){ var el=document.getElementById(id); if(el) el.click(); }
+  document.getElementById('calc-all')?.addEventListener('click', function(){
+    function have4(){ var ids=['mc-c1','mc-c2','mc-c3','mc-c4']; return ids.every(id=>{ var el=document.getElementById(id); return el && el.value; }); }
+    if(!have4()){ return; }
+    clickIf('mc-run'); // odds
+    clickIf('mc-mus-bias'); // decision mus
+    clickIf('btn-gil-reco'); // descarte óptimo
+    clickIf('aat-decidir'); // asesor automático
+  });
+  // Also auto-run when cartas cambian
+  ['mc-c1','mc-c2','mc-c3','mc-c4'].forEach(id=>{
+    const el=document.getElementById(id); if(el){ el.addEventListener('change', ()=>{ var ids=['mc-c1','mc-c2','mc-c3','mc-c4']; if(ids.every(i=>{ var e=document.getElementById(i); return e && e.value; })){ document.getElementById('calc-all').click(); }}); }
+  });
+  // Sync "31 real" to any module that reads #opt31real (already global).
+})();</script>
+</div>
+<script>
+(function(){
+  // Toggles verdes/rojos
+  function setupToggle(spanId, inputEl, labelYes, labelNo){
+    const span = document.getElementById(spanId);
+    if (!span) return;
+    const label = span.querySelector('.label');
+    function render(){
+      if(inputEl.checked){ span.classList.add('on'); span.classList.remove('off'); label.textContent = labelYes; }
+      else { span.classList.add('off'); span.classList.remove('on'); label.textContent = labelNo; }
+    }
+    span.addEventListener('click', ()=>{ inputEl.checked = !inputEl.checked; render(); });
+    render();
+  }
+  const opt31real = document.getElementById("opt31real");
+  const optMano  = document.getElementById("optMano");
+  setupToggle('tg31', opt31real, '31 real: SÍ', '31 real: NO');
+  setupToggle('tgMano', optMano, 'Soy mano: SÍ', 'Soy mano: NO');
+})();
+</script>
+<!-- === PANEL DE PROBABILIDADES (inyectado) === -->
+<div class="wrap">
+<div class="grid" style="margin-top:12px">
+</div>
+</div>
+<script>
+
+// === PROBABILIDADES/SIMULADOR (inyectado) ===
+(function(){
+  // Base stats (exactos, 8 reyes / 8 ases)
+  const TOTAL = 91390;
+  const PARES = 51710; // cualquier pares
+  const DUPLES = 3486;
+  const MEDIAS = 4448;
+  const PAR_SIMPLE = 43776;
+  const JUEGO = 24444;
+  const TREINTA_Y_UNO = 8384;
+  const TREINTA_Y_UNO_CON_PARES = 3264;
+  const TREINTA_Y_UNO_SIN_PARES = 5120;
+  const SIN_JUEGO = 66946;
+  const PUNTO_30 = 3024;
+  function pct(n,d=TOTAL){ return (100*n/d).toFixed(1); }
+  function set(id, txt){ const el = document.getElementById(id); if(el) el.textContent = txt; }
+
+  // Pinta KPIs base
+  set("kpi-pares", pct(PARES));
+  set("kpi-juego", pct(JUEGO));
+  set("kpi-punto30", (100*PUNTO_30/SIN_JUEGO).toFixed(1));
+  set("kpi-duples", pct(DUPLES));
+  set("kpi-medias", pct(MEDIAS));
+  set("kpi-par", pct(PAR_SIMPLE));
+  set("kpi-31-con-pares", (100*TREINTA_Y_UNO_CON_PARES/TREINTA_Y_UNO).toFixed(1));
+  set("kpi-31-sin-pares", (100*TREINTA_Y_UNO_SIN_PARES/TREINTA_Y_UNO).toFixed(1));
+
+  // Utilidades comunes del asesor original (si existen), si no, definimos mínimos
+  const ORDER_GRANDE = (typeof window.ORDER_GRANDE !== "undefined") ? window.ORDER_GRANDE : ["R","3","C","S","7","6","5","4","A","2"];
+  const ORDER_CHICA = ORDER_GRANDE.slice().reverse();
+  const JUEGO_VALUE = (typeof window.JUEGO_VALUE !== "undefined") ? window.JUEGO_VALUE : {"R":10,"3":10,"C":10,"S":10,"7":7,"6":6,"5":5,"4":4,"A":1,"2":1};
+
+  function sortByOrder(hand, order){ return hand.slice().sort((a,b)=>order.indexOf(a)-order.indexOf(b)); }
+  function compareLists(a, b, order){
+    const A = sortByOrder(a, order);
+    const B = sortByOrder(b, order);
+    for(let i=0;i<4;i++){
+      const da = order.indexOf(A[i]);
+      const db = order.indexOf(B[i]);
+      if(da < db) return 1; // a gana
+      if(da > db) return -1; // b gana
+    }
+    return 0; // empate exacto
+  }
+  function juegoInfo(hand){
+    const sum = hand.reduce((a,c)=>a+(JUEGO_VALUE[c]||0),0);
+    const hasJuego = sum>=31;
+    const is31 = sum===31;
+    const isReal = is31 && (hand.filter(x=>x==="7").length===3) && hand.some(x=>["R","C","S"].includes(x));
+    return {sum, hasJuego, is31, isReal};
+  }
+  function paresInfo(hand){
+    const counts = {};
+    hand.forEach(c=>{counts[c]=(counts[c]||0)+1;});
+    const groups = Object.entries(counts).sort((a,b)=>{
+      const [ka,va]=a,[kb,vb]=b;
+      if(va!==vb) return vb-va;
+      return ORDER_GRANDE.indexOf(ka)-ORDER_GRANDE.indexOf(kb);
+    });
+    let type="nada", key=[];
+    if(groups[0] && groups[0][1]===4){ type="medias"; key=[groups[0][0], groups[0][0]]; } // 4 iguales (se trata como medias top)
+    else if(groups[0] && groups[0][1]===3){ type="medias"; key=[groups[0][0]]; }
+    else if(groups[0] && groups[1] && groups[0][1]===2 && groups[1][1]===2){ type="duples"; key=[groups[0][0], groups[1][0]]; }
+    else if(groups[0] && groups[0][1]===2){ type="par"; key=[groups[0][0]]; }
+    return {type, key, groups};
+  }
+  function comparePares(a,b){
+    const pa = paresInfo(a), pb = paresInfo(b);
+    if (pa.type === "nada" && pb.type === "nada") return null; // señal: no se juega Pares
+    const rank = {"nada":0,"par":1,"medias":2,"duples":3};
+    if(rank[pa.type]!==rank[pb.type]) return (rank[pa.type]>rank[pb.type])?1:-1;
+    // desempates
+    if(pa.type==="par" || pa.type==="medias"){
+      const ka = pa.key[0], kb = pb.key[0];
+      if(ka!==kb) return (ORDER_GRANDE.indexOf(ka) < ORDER_GRANDE.indexOf(kb))?1:-1;
+      return compareLists(a,b,ORDER_GRANDE);
+    }
+    if(pa.type==="duples"){
+      // comparar par alto, luego bajo
+      const [a1,a2] = pa.key.slice().sort((x,y)=>ORDER_GRANDE.indexOf(x)-ORDER_GRANDE.indexOf(y));
+      const [b1,b2] = pb.key.slice().sort((x,y)=>ORDER_GRANDE.indexOf(x)-ORDER_GRANDE.indexOf(y));
+      if(a1!==b1) return (ORDER_GRANDE.indexOf(a1) < ORDER_GRANDE.indexOf(b1))?1:-1;
+      if(a2!==b2) return (ORDER_GRANDE.indexOf(a2) < ORDER_GRANDE.indexOf(b2))?1:-1;
+      return compareLists(a,b,ORDER_GRANDE);
+    }
+    // nada: comparar grande como desempate de "no hay pares"
+    return compareLists(a,b,ORDER_GRANDE);
+  }
+  function compareJuego(a,b, use31real){
+    const ja = juegoInfo(a), jb = juegoInfo(b);
+    if(ja.hasJuego && !jb.hasJuego) return 1;
+    if(!ja.hasJuego && jb.hasJuego) return -1;
+    if(ja.hasJuego && jb.hasJuego){
+      // ranking: 31 (real opcional) > 32 > 40 > 37 > 36 > 35 > 34 > 33
+      if(ja.is31 && jb.is31){
+        if(use31real && ja.isReal!==jb.isReal) return ja.isReal?1:-1;
+        // si ambos 31 iguales, gana mano fuera de aquí
+        return 0;
+      }
+      const orderJuego = [31,32,40,37,36,35,34,33];
+      const ia = orderJuego.indexOf(ja.sum);
+      const ib = orderJuego.indexOf(jb.sum);
+      if(ia!==ib) return (ia<ib)?1:-1;
+      return 0;
+    } else {
+      // Al punto: 30 > 29 > ... > 4
+      if(ja.sum!==jb.sum) return (ja.sum>jb.sum)?1:-1;
+      return 0;
+    }
+  }
+
+  function deck40(){
+    // Tipos: R,3,C,S,7,6,5,4,A,2 (cuatro por tipo)
+    const ranks = ["R","3","C","S","7","6","5","4","A","2"];
+    const d=[];
+    for(const r of ranks){ for(let i=0;i<4;i++) d.push(r); }
+    return d;
+  }
+  function removeOnce(arr, val){
+    const i = arr.indexOf(val);
+    if(i>=0) arr.splice(i,1);
+  }
+  function drawN(arr, n){
+    const out=[];
+    for(let i=0;i<n;i++){
+      const j = Math.floor(Math.random()*arr.length);
+      out.push(arr[j]);
+      arr.splice(j,1);
+    }
+    return out;
+  }
+
+  function teamWins(lanceCompare, hand, opts){
+    // Monte Carlo
+    const iters = opts.iters||20000;
+    let wins=0, ties=0;
+    for(let t=0;t<iters;t++){
+      const d = deck40();
+      // quita tus 4
+      const h = hand.slice();
+      for(const c of h){ removeOnce(d,c); }
+      // reparte: compañero, op1, op2
+      const comp = drawN(d,4);
+      const op1 = drawN(d,4);
+      const op2 = drawN(d,4);
+      // mejor rival
+      const c12 = lanceCompare(comp, hand, opts);
+      const topOur = (c12>=0) ? comp : hand;
+      const r12 = lanceCompare(op1, op2, opts);
+      const topRiv = (r12>=0) ? op1 : op2;
+      
+      // Condicionar por 'cortan ellos': reintentar muestras hasta coherentes con cortar según heurística PDF
+      if (opts.cutWho === 'them') {
+        let safety=0;
+        while(safety++<200 && !((opts.hadMus==='yes'
+            ? ( (function(){ const r12 = lanceCompare(op1, op2, opts); const topR = (r12>=0)? op1 : op2; return isCutWorthy(topR, lanceTag, opts.usAm||0, opts.thAm||0); })() )
+            : (isCutWorthy(op1, lanceTag, opts.usAm||0, opts.thAm||0) || isCutWorthy(op2, lanceTag, opts.usAm||0, opts.thAm||0))
+          ))){
+          // re-sample op1/op2 manos y descartes
+          let deck2 = deck40();
+          // remove my and comp cards from deck2
+          const used = hand.concat(comp);
+          used.forEach(c=>{ const k=deck2.indexOf(c); if(k>=0) deck2.splice(k,1); });
+          op1 = drawN(deck2,4);
+          op2 = drawN(deck2,4);
+          // aplicar descartes PDF de rivales
+          op1  = window.applyDiscardsAndDraw(op1 , deck2, dOp1 , 'pdf',    lanceTag, {mano:false});
+          op2  = window.applyDiscardsAndDraw(op2 , deck2, dOp2 , 'pdf',    lanceTag, {mano:false});
+        }
+      }
+let cmp = lanceCompare(topOur, topRiv, opts);
+      if(cmp===0){
+        // desempata la mano: si opts.mano true somos mano (equipo A)
+        cmp = opts.mano? 1 : -1;
+      }
+      if(cmp>0) wins++;
+      else if(cmp===0) ties++;
+    }
+    return wins/iters;
+  }
+
+  function compGrande(a,b){ return compareLists(a,b,ORDER_GRANDE); }
+  function compChica(a,b){ return compareLists(a,b,ORDER_CHICA); }
+  function compPares(a,b){ return comparePares(a,b); }
+  function compJuego(a,b,opts){ return compareJuego(a,b, !!opts.use31real); }
+
+  // --- Lógica de Recomendaciones ---
+  function section(titulo, accion, porQue, bullets){
+    return `
+    <div class="row" style="align-items:flex-start;gap:12px;margin:10px 0">
+      <div style="min-width:120px"><span class="tag">${titulo}</span></div>
+      <div style="flex:1">
+        <div style="font-weight:700">${accion}</div>
+        <div class="tip">${porQue}</div>
+        ${bullets && bullets.length? `<ul>`+ bullets.map(x=>`<li>${x}</li>`).join("") + `</ul>`:``}
+      </div>
+    </div>`;
+  }
+
+  function getLanceAdvice(prob, lanceName, esMano) {
+      const TH_ORDAGO = 0.85;
+      const TH_ENVIDA_FUERTE = 0.70;
+      const TH_ENVIDA = 0.60;
+      
+      if (prob >= TH_ORDAGO) return { advise: "Órdago", reason: `Prob. de ganar ${lanceName} es altísima (${(prob*100).toFixed(0)}%).` };
+      if (prob >= TH_ENVIDA_FUERTE) return { advise: "Envida fuerte", reason: `Muy buena prob. de ganar ${lanceName} (${(prob*100).toFixed(0)}%).` };
+      if (prob >= TH_ENVIDA) return { advise: "Envida", reason: `Buena prob. de ganar ${lanceName} (${(prob*100).toFixed(0)}%).` };
+      if (prob >= 0.50 && esMano) return { advise: "Envida leve", reason: `Prob. favorable (${(prob*100).toFixed(0)}%) y eres mano.` };
+      if (prob >= 0.40) return { advise: "Pasa / Ver", reason: `Prob. decente (${(prob*100).toFixed(0)}%). Considera ver un envite bajo.` };
+      return { advise: "Pasa", reason: `Prob. baja de ganar ${lanceName} (${(prob*100).toFixed(0)}%).` };
+  }
+
+  function generarRecomendaciones(probs, esMano) {
+      const recs = [];
+      
+      const avgProb = (probs.grande + probs.chica + probs.pares + probs.juego) / 4;
+      let musDecision, musReason;
+      if (avgProb > 0.65 || probs.pares > 0.8 || probs.juego > 0.8) {
+          musDecision = "Corta: NO HAY MUS";
+          musReason = `Mano muy fuerte con una probabilidad media de victoria de ${(avgProb*100).toFixed(0)}%.`;
+      } else {
+          musDecision = "Pide MUS";
+          musReason = `La mano puede mejorar. Probabilidad media de victoria actual: ${(avgProb*100).toFixed(0)}%.`;
+      }
+      recs.push(section("Decisión de MUS", musDecision, musReason, []));
+
+      const grandeAdvice = getLanceAdvice(probs.grande, "Grande", esMano);
+      recs.push(section("Grande", grandeAdvice.advise, grandeAdvice.reason, []));
+
+      const chicaAdvice = getLanceAdvice(probs.chica, "Chica", esMano);
+      recs.push(section("Chica", chicaAdvice.advise, chicaAdvice.reason, []));
+
+      const paresAdvice = getLanceAdvice(probs.pares, "Pares", esMano);
+      let paresReason = paresAdvice.reason;
+      if (probs.pares < 0.01) { paresAdvice.advise = "Pasa"; paresReason = "No tienes pares o la probabilidad de ganar es casi nula."; }
+      recs.push(section("Pares", paresAdvice.advise, paresReason, []));
+
+      const juegoAdvice = getLanceAdvice(probs.juego, "Juego/Punto", esMano);
+      let juegoReason = juegoAdvice.reason;
+      if (probs.juego < 0.01) { juegoAdvice.advise = "Pasa"; juegoReason = "No tienes juego o la probabilidad de ganar es casi nula."; }
+      recs.push(section("Juego / Punto", juegoAdvice.advise, juegoReason, []));
+
+      document.getElementById("recs").innerHTML = recs.join("");
+  }
+
+  // UI wiring
+  const RANK_OPTIONS = ["A","2","3","4","5","6","7","S","C","R"];
+  ["mc-c1","mc-c2","mc-c3","mc-c4"].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    for(const r of RANK_OPTIONS){
+      const o = document.createElement("option"); o.value=r; o.textContent=r;
+      sel.appendChild(o);
+    }
+  });
+
+  function getManualHand(){
+    const vals = ["mc-c1","mc-c2","mc-c3","mc-c4"].map(id=>document.getElementById(id).value).filter(Boolean);
+    if(vals.length!==4) return null;
+    return vals;
+  }
+
+  function fmt(p){ return (p*100).toFixed(1)+"%"; }
+
+  function runMC(hand){
+    // read context
+    const cutWho = ((document.getElementById("sc-who")?document.getElementById("sc-who").value:"")) || "none";
+    const usAm = parseInt((document.getElementById("sc-us-am")?document.getElementById("sc-us-am").value:"0")||"0",10);
+    const thAm = parseInt((document.getElementById("sc-th-am")?document.getElementById("sc-th-am").value:"0")||"0",10);
+    // had mus remembered (default yes)
+    let hadMus = (localStorage.getItem("hadMus")||"yes");
+    if(hadMus!=="yes" && hadMus!=="no"){ hadMus="yes"; localStorage.setItem("hadMus","yes"); }
+
+    const use31real = document.getElementById("opt31real").checked;
+    const mano = document.getElementById("optMano").checked;
+
+    const iters = parseInt(document.getElementById("mc-iters").value||"20000",10);
+    const opts = {use31real, mano, iters, cutWho, usAm, thAm, hadMus};
+    const pG = teamWins(compGrande, hand, opts);
+    const pC = teamWins(compChica, hand, opts);
+    const pP = teamWins(compPares, hand, opts);
+    const pJ = teamWins((a,b,o)=>compJuego(a,b,o), hand, opts);
+    set("mc-grande", fmt(pG));
+    set("mc-chica", fmt(pC));
+    set("mc-pares", fmt(pP));
+    set("mc-juego", fmt(pJ));
+    const note = document.getElementById("mc-note");
+    if(note){
+      note.textContent = `[Inferencia] Monte Carlo ${iters.toLocaleString()} iteraciones · mano=${mano?"sí":"no"} · 31 real=${use31real?"sí":"no"} · mus=${hadMus}. Las odds son aproximadas.`;
+    }
+
+    const probs = { grande: pG, chica: pC, pares: pP, juego: pJ };
+    generarRecomendaciones(probs, mano);
+  }
+
+  const btnRun = document.getElementById("mc-run");
+  if(btnRun){
+    btnRun.addEventListener("click", ()=>{
+      const hand = getManualHand();
+      if(!hand){ return; return; }
+      runMC(hand);
+    });
+  }
+})(); 
+
+</script>
+<script>
+// === ENHANCER: descarta cartas conocidas y modela nº de descartes por jugador ===
+(function(){
+  const RANK_OPTIONS = ["A","2","3","4","5","6","7","S","C","R"];
+  // llenar selects de descartes
+  ["mc-d1","mc-d2","mc-d3","mc-d4"].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    for(const r of RANK_OPTIONS){
+      const o = document.createElement("option"); o.value=r; o.textContent=r;
+      sel.appendChild(o);
+    }
+  });
+
+  function deck40(){
+    const ranks = ["R","3","C","S","7","6","5","4","A","2"];
+    const d=[]; for(const r of ranks){ for(let i=0;i<4;i++) d.push(r); } return d;
+  }
+  function removeOnce(arr, val){
+    const i = arr.indexOf(val); if(i>=0) arr.splice(i,1);
+  }
+  function drawN(arr, n){
+    const out=[];
+    for(let i=0;i<n;i++){
+      const j = Math.floor(Math.random()*arr.length);
+      out.push(arr[j]); arr.splice(j,1);
+    }
+    return out;
+  }
+
+  // Helpers ya definidos en el script base si existen:
+  const ORDER_GRANDE = (typeof window.ORDER_GRANDE !== "undefined") ? window.ORDER_GRANDE : ["R","3","C","S","7","6","5","4","A","2"];
+  const ORDER_CHICA = ORDER_GRANDE.slice().reverse();
+  const JUEGO_VALUE = (typeof window.JUEGO_VALUE !== "undefined") ? window.JUEGO_VALUE : {"R":10,"3":10,"C":10,"S":10,"7":7,"6":6,"5":5,"4":4,"A":1,"2":1};
+
+  function sortBy(hand, order){ return hand.slice().sort((a,b)=>order.indexOf(a)-order.indexOf(b)); }
+  function juegoSum(hand){ return hand.reduce((a,c)=>a+(JUEGO_VALUE[c]||0),0); }
+  function paresProfile(hand){
+    const counts={}; hand.forEach(c=>counts[c]=(counts[c]||0)+1);
+    const entries = Object.entries(counts).sort((a,b)=> b[1]-a[1] || ORDER_GRANDE.indexOf(a[0])-ORDER_GRANDE.indexOf(b[0]));
+    return entries; // [ [rank, count], ... ]
+  }
+
+  function chooseDiscardsForLance(hand, n, lance){
+    if(n<=0) return [];
+    const h = hand.slice();
+    if(lance==="grande"){
+      // tirar los más bajos (peores para grande)
+      const byGrande = sortBy(h, ORDER_GRANDE).slice().reverse(); // lowest at end? We want lowest -> discard
+      // actually ORDER_GRANDE is from high to low index small -> high; sortBy returns high..low; to get lowest, reverse
+      return byGrande.slice(-n);
+    }
+    if(lance==="chica"){
+      // tirar los más altos (peores para chica)
+      const byChica = sortBy(h, ORDER_CHICA).slice().reverse();
+      return byChica.slice(-n);
+    }
+    if(lance==="pares"){
+      // mantener cartas que forman pares; tirar las que menos ayudan
+      const prof = paresProfile(h);
+      // cards not in top pair groups are candidates
+      const keep = new Set();
+      if(prof.length && prof[0][1]>=2){
+        h.forEach(c=>{ if(c===prof[0][0]) keep.add(c); });
+      }
+      if(prof.length>1 && prof[1][1]>=2){
+        h.forEach(c=>{ if(c===prof[1][0]) keep.add(c); });
+      }
+      // candidates to discard: those not in keep, from worst for grande
+      const cand = h.filter(c=>!keep.has(c));
+      const ordered = sortBy(cand, ORDER_GRANDE).slice().reverse();
+      return ordered.slice(-n);
+    }
+    if(lance==="juego"){
+      // intentar aproximarse a 31: conservar 7's y figuras; descartar lo demás empezando por las más bajas
+      const keep = new Set();
+      h.forEach(c=>{ if(c==="7"||c==="R"||c==="C"||c==="S"||c==="3") keep.add(c); }); // 3 vale 10
+      // si ya hay 31 o 32 etc., tirar los que menos aportan a ese total (heurística)
+      const cand = h.filter(c=>!keep.has(c));
+      const ordered = sortBy(cand, ORDER_GRANDE).slice().reverse(); // descartar bajos primero
+      return ordered.slice(0, Math.min(n, ordered.length));
+    }
+    // fallback
+    return sortBy(h, ORDER_GRANDE).slice().reverse().slice(-n);
+  }
+
+  function applyDiscardsAndDraw(hand, deck, n, strategy, lanceTag){
+    if(!n) return hand;
+    let toDiscard = [];
+    if(strategy==="lance"){
+      toDiscard = chooseDiscardsForLance(hand, n, lanceTag);
+    } else {
+      // aleatorio
+      const tmp = hand.slice();
+      for(let i=0;i<n;i++){
+        const j=Math.floor(Math.random()*tmp.length);
+        toDiscard.push(tmp.splice(j,1)[0]);
+      }
+    }
+    // quitar seleccionados del hand real
+    toDiscard.forEach(c=>{ const idx = hand.indexOf(c); if(idx>=0) hand.splice(idx,1); });
+    // robar
+    const drawn = drawN(deck, n);
+    return hand.concat(drawn);
+  }
+
+  // Redefinimos teamWins para considerar descartes conocidos y nº de descartes de otros
+  const _teamWins_old = (typeof window.teamWins === "function") ? window.teamWins : null;
+  window.teamWins = function(lanceCompare, hand, opts){
+    // --- helpers for conditioning by 'corte' and tanteo ---
+    function juegoSum(h){ const val={"R":10,"3":10,"C":10,"S":10,"7":7,"6":6,"5":5,"4":4,"A":1,"2":1}; return h.reduce((a,c)=>a+(val[c]||0),0); }
+    function countRanks(h){ const m={}; h.forEach(c=>m[c]=(m[c]||0)+1); return m; }
+    function hasPairOrBetter(h){ const m=countRanks(h); return Object.values(m).some(v=>v>=2); }
+    function grandeScore(h){ const order=["R","3","C","S","7","6","5","4","A","2"]; return h.map(c=>order.indexOf(c)).sort((a,b)=>a-b); }
+    function isCutWorthy(h, lance, usAm, thAm){
+      // [Inferencia] Heurística basada en textos: cortar suele implicar fuerza en el lance principal o plan claro (31/pares). fileciteturn5file18 fileciteturn5file2
+      const m=countRanks(h);
+      const sum=juegoSum(h);
+      const nearWinThem = thAm>=6; // 6-7 hamarrekos cerca de cerrar
+      const behindThem  = thAm+usAm<8 && thAm<usAm; // van por detrás
+      if(lance==="grande"){
+        // fuerte a grande si tiene >=2 figuras top o pareja alta, o 31/40 (implica figuras)
+        const hi = (m["R"]||0)+(m["3"]||0)+(m["C"]||0)+(m["S"]||0);
+        if(hi>=3) return true;
+        if((m["R"]||0)>=2) return true;
+        if(sum>=39) return true; // 31 o 40
+        // si van por detrás, aceptamos un poco menos para incentivar corte agresivo
+        if(behindThem && (hi>=2 || hasPairOrBetter(h))) return true;
+        return false;
+      } else if(lance==="pares"){
+        if(hasPairOrBetter(h)) return true;
+        return false;
+      } else if(lance==="juego"){
+        if(sum>=31) return true;
+        if(nearWinThem && sum>=29) return true;
+        return false;
+      } else { // chica
+        // cortar a chica sin pares/juego suele ser raro salvo tanteo; exigir bajos claros o falta de juego
+        const lows=(h.filter(c=>c==="A"||c==="2"||c==="4").length);
+        if(lows>=3 && !hasPairOrBetter(h)) return true;
+        return false;
+      }
+    }
+    
+    const iters = opts.iters||20000;
+    const dMine = (opts.discardsMine||[]).slice(0,4).filter(Boolean);
+    const dComp = Math.max(0, Math.min(4, opts.dComp||0));
+    const dOp1  = Math.max(0, Math.min(4, opts.dOp1||0));
+    const dOp2  = Math.max(0, Math.min(4, opts.dOp2||0));
+    const dStrategy = opts.discardStrategy || "random"; // "random" | "lance"
+    const mano = !!opts.mano;
+    // map lance tag for strategy
+    const lanceTag = (function(){
+      if(lanceCompare.name.includes("Grande") || lanceCompare===window.compGrande) return "grande";
+      if(lanceCompare.name.includes("Chica") || lanceCompare===window.compChica) return "chica";
+      if(lanceCompare.name.includes("Pares") || lanceCompare===window.compPares) return "pares";
+      return "juego";
+    })();
+
+    function draw4WithKings(deck, k){
+      const want = Math.max(0, Math.min(4, k));
+      const hand = [];
+      const haveKings = ()=> hand.filter(x=>x==="R" || x==="3").length;
+      // Prioriza R, luego 3
+      while(haveKings() < want){
+        let ix = deck.indexOf("R");
+        if(ix<0) ix = deck.indexOf("3");
+        if(ix<0) break;
+        hand.push(deck.splice(ix,1)[0]);
+      }
+      while(hand.length<4 && deck.length){
+        const j = Math.floor(Math.random()*deck.length);
+        hand.push(deck.splice(j,1)[0]);
+      }
+      return hand;
+    }
+
+    let wins=0, ties=0;
+    for(let t=0;t<iters;t++){
+      const deck = deck40();
+      // elimina mi mano final y mis descartes conocidos del mazo
+      const myFinal = hand.slice(); // asumimos que el usuario ya muestra su mano FINAL
+      myFinal.forEach(c=>removeOnce(deck,c));
+      dMine.forEach(c=>removeOnce(deck,c)); // cartas que sabe que están fuera
+
+      const kComp = Math.max(0, 4 - dComp);
+      const kOp1  = Math.max(0, 4 - dOp1);
+      const kOp2  = Math.max(0,  4 - dOp2);
+
+      let comp = draw4WithKings(deck, kComp);
+      let op1  = draw4WithKings(deck, kOp1);
+      let op2  = draw4WithKings(deck, kOp2);
+
+      if (opts.cutWho === 'them') {
+        let safety=0;
+        while(safety++<200 && !((opts.hadMus==='yes'
+            ? ( (function(){ const r12 = lanceCompare(op1, op2, opts); const topR = (r12>=0)? op1 : op2; return isCutWorthy(topR, lanceTag, opts.usAm||0, opts.thAm||0); })() )
+            : (isCutWorthy(op1, lanceTag, opts.usAm||0, opts.thAm||0) || isCutWorthy(op2, lanceTag, opts.usAm||0, opts.thAm||0))
+          ))){
+          // re-sample op1/op2 manos y descartes
+          let deck2 = deck40();
+          // remove my and comp cards from deck2
+          const used = hand.concat(comp);
+          used.forEach(c=>{ const k=deck2.indexOf(c); if(k>=0) deck2.splice(k,1); });
+          dMine.forEach(c=>{ const k=deck2.indexOf(c); if(k>=0) deck2.splice(k,1); });
+
+          op1 = draw4WithKings(deck2, Math.max(0, 4 - dOp1));
+          op2 = draw4WithKings(deck2, Math.max(0, 4 - dOp2));
+        }
+      }
+
+      // elige mejor de cada pareja
+      const c12 = lanceCompare(comp, myFinal, opts);
+      const topOur = (c12>=0) ? comp : myFinal;
+      const r12 = lanceCompare(op1, op2, opts);
+      const topRiv = (r12>=0) ? op1 : op2;
+
+      let cmp = lanceCompare(topOur, topRiv, opts);
+      if(cmp===0){ cmp = mano?1:-1; }
+      if(cmp>0) wins++; else if(cmp===0) ties++;
+    }
+    return wins/iters;
+  };
+
+  // Redefinimos runMC para leer los nuevos campos
+  const _runMC_old = (typeof window.runMC === "function") ? window.runMC : null;
+  window.runMC = function(hand){ // This re-definition is now the main one
+    const use31real = document.getElementById("opt31real").checked;
+    const mano = document.getElementById("optMano").checked;
+    const iters = parseInt(document.getElementById("mc-iters").value||"20000",10);
+
+    // nuevos campos
+    const discardsMine = ["mc-d1","mc-d2","mc-d3","mc-d4"].map(id=>document.getElementById(id)?.value).filter(Boolean);
+    const dComp = parseInt(document.getElementById("mc-dcomp")?.value||"0",10);
+    const dOp1  = parseInt(document.getElementById("mc-dop1")?.value ||"0",10);
+    const dOp2  = parseInt(document.getElementById("mc-dop2")?.value ||"0",10);
+    const discardStrategy = document.getElementById("mc-dstrategy")?.value || "random";
+
+    
+    const cutWho = ((document.getElementById("sc-who")?document.getElementById("sc-who").value:""))||"none";
+    const usAm = parseInt((document.getElementById("sc-us-am")?document.getElementById("sc-us-am").value:"0")||"0",10);
+    const thAm = parseInt((document.getElementById("sc-th-am")?document.getElementById("sc-th-am").value:"0")||"0",10);
+    let hadMus = (localStorage.getItem("hadMus")||"yes");
+    if(hadMus!=="yes" && hadMus!=="no"){ hadMus="yes"; localStorage.setItem("hadMus","yes"); }
+    const opts = {use31real, mano, iters, discardsMine, dComp, dOp1, dOp2, discardStrategy, cutWho, usAm, thAm, hadMus};
+    const pG = window.teamWins(window.compGrande, hand, opts);
+    const pC = window.teamWins(window.compChica,  hand, opts);
+    const pP = window.teamWins(window.compPares,  hand, opts);
+    const pJ = window.teamWins((a,b,o)=>window.compJuego(a,b,o), hand, opts);
+
+    const fmt = (p)=> (p*100).toFixed(1)+"%";
+    const set = (id, txt)=>{ const el=document.getElementById(id); if(el) el.textContent=txt; };
+
+    set("mc-grande", fmt(pG));
+    set("mc-chica",  fmt(pC));
+    set("mc-pares",  fmt(pP));
+    set("mc-juego",  fmt(pJ));
+
+    const note = document.getElementById("mc-note");
+    if(note){
+      note.textContent = `[Inferencia] Monte Carlo ${iters.toLocaleString()} · mano=${mano?"sí":"no"} · 31 real=${use31real?"sí":"no"} · mis descartes=[${discardsMine.join(",")||"—"}] · dComp=${dComp} · dOp1=${dOp1} · dOp2=${dOp2} · estrategia=${discardStrategy} · cortan=${cutWho} · tanteo us=${usAm} th=${thAm}.`;
+    }
+
+    const probs = { grande: pG, chica: pC, pares: pP, juego: pJ };
+    if (typeof window.generarRecomendaciones === 'function') window.generarRecomendaciones(probs, mano);
+  };
+})();
+</script>
+<script>
+// === Estrategia "según PDF": aplica reglas textuales de los documentos ===
+// Fuentes clave citadas en la UI del simulador.
+(function(){
+  // utilidades
+  const ORDER_GRANDE = (typeof window.ORDER_GRANDE !== "undefined") ? window.ORDER_GRANDE : ["R","3","C","S","7","6","5","4","A","2"];
+  const ORDER_CHICA = ORDER_GRANDE.slice().reverse();
+  const JUEGO_VALUE = (typeof window.JUEGO_VALUE !== "undefined") ? window.JUEGO_VALUE : {"R":10,"3":10,"C":10,"S":10,"7":7,"6":6,"5":5,"4":4,"A":1,"2":1};
+  function sortByOrder(hand, order){ return hand.slice().sort((a,b)=>order.indexOf(a)-order.indexOf(b)); }
+  function countRanks(hand){ const m={}; hand.forEach(c=>m[c]=(m[c]||0)+1); return m; }
+  function juegoSum(hand){ return hand.reduce((a,c)=>a+(JUEGO_VALUE[c]||0),0); }
+
+  // reglas extraídas de TRATADO y materiales:
+  // - Mano debe buscar 31; ases al montón salvo excepciones; no tirar caballos; proteger K,K,C,7 ("ley del mus").
+  // - Con dos reyes se puede quedar con un as; NO quedarse con R/C/A (preferible descartar el As).
+  // - Dos sietes: evitar perseguir 34 (no forzar descarte hacia 34).
+  // - Con tres ases: si vas a descartarte, no conservar los tres (romperlos).
+  // - Con duples altos, evitar guerra de grande.
+  // Estas guías afectan PRIORIDAD de descarte por lance.
+  function chooseDiscardsPDF(hand, n, lance, roleOpts){
+    // [MODIFICACIÓN] Si se descartan 2 cartas, usar el asesor de retención para unificar la lógica.
+    if (n === 2 && typeof window.asumirRetencionDesdeCuatro === 'function') {
+      const { keep } = window.asumirRetencionDesdeCuatro(hand, roleOpts || {});
+      if (keep && keep.length === 2) {
+          const toDiscard = hand.slice();
+          // Quitar las cartas a conservar para obtener las de descarte.
+          // Esto maneja correctamente las cartas duplicadas (ej: quedarse con un par).
+          keep.forEach(k => {
+              const i = toDiscard.indexOf(k);
+              if (i >= 0) toDiscard.splice(i, 1);
+          });
+          return toDiscard;
+      }
+    }
+    if(n<=0) return [];
+    const mano = !!(roleOpts && roleOpts.mano);
+    const ranks = countRanks(hand);
+    const keep = new Set();
+
+    // 1) Reglas universales
+    // No tirar caballos (prioridad alta de conservación)
+    hand.forEach(c=>{ if(c==="C") keep.add(c); }); // “Los caballos no se tiran”.
+    // Proteger duples/medias existentes
+    Object.entries(ranks).forEach(([k,v])=>{ if(v>=2) { for(let i=0;i<v;i++) keep.add(k); } });
+
+    // 2) Reglas por lance
+    if(lance==="grande"){
+      // Proteger altos para grande: R,3,S y ya protegidos C
+      hand.forEach(c=>{ if(c==="R"||c==="3"||c==="S") keep.add(c); });
+      // Ases al montón por norma general (no los añadimos a keep)
+    } else if(lance==="chica"){
+      // Proteger bajos para chica: A,2,4 (y conservar pares ya marcados)
+      hand.forEach(c=>{ if(c==="A"||c==="2"||c==="4") keep.add(c); });
+      // Altos son candidatos a descarte
+    } else if(lance==="pares"){
+      // Ya protegimos pares; reforzar figuras altas de par potencial (R,C,S) para duples altos
+      // Si no hay pares, intenta formar con figuras: protege cualquier duplicidad potencial si hay 1 rey/caballo/sota ya
+      ["R","C","S","3","7"].forEach(k=>{ if(ranks[k]===1) keep.add(k); });
+    } else { // juego/punto
+      // Buscar 31: proteger 7 y todas las figuras (R,C,S,3). As y pitos a descarte salvo excepciones.
+      hand.forEach(c=>{ if(c==="7"||c==="R"||c==="C"||c==="S"||c==="3") keep.add(c); });
+      // Excepciones del texto:
+      // - Con dos reyes se puede quedar con un as
+      if(ranks["R"]>=2 && ranks["A"]>=1){ keep.add("A"); }
+      // - Evitar patrón R/C/A: si exacto R,C,A presentes y hay que soltar algo -> soltar A
+      // Implementación: no añadir A a keep cuando hay R y C pero NO dos reyes
+      if(!(ranks["R"]>=2) && ranks["R"]>=1 && ranks["C"]>=1){
+        // si habíamos marcado A por otra razón, la removemos
+        keep.delete("A");
+      }
+      // - Dos sietes: no forzar 34 -> no descartes para perseguir 34; mantener 7 pero priorizar tirar pipas bajas
+      // ya conservamos 7 por defecto
+      // - Tres ases: si te descartas, no conservar los tres: no marcar todos los A; deja al menos uno sin keep
+      if(ranks["A"]>=3){
+        // deja uno A como no-keep si ya hay demasiados
+        // remove A from keep to allow descartar al menos uno
+        keep.delete("A");
+      }
+    }
+
+    // 3) Construir lista de candidatos a tirar según prioridad
+    // Orden base de descarte por lance
+    let discardOrder;
+    if(lance==="grande"){
+      discardOrder = ["A","2","4","5","6","7","S","3","R"]; // altos al final
+    } else if(lance==="chica"){
+      discardOrder = ["R","3","C","S","7","6","5","4","2","A"]; // bajos al final
+    } else if(lance==="pares"){
+      // tirar singletas que no ayuden a pares, empezando por las peores a grande
+      discardOrder = ["A","2","4","5","6","7","S","3","R","C"];
+    } else { // juego
+      discardOrder = ["A","2","4","5","6","7","S","C","3","R"]; // figuras y 7 protegidas
+    }
+
+    // lista de cartas reales a tirar respetando keep y número n
+    const toDiscard = [];
+    const pool = hand.slice();
+    // si tenemos más cartas marcadas como keep que 4-n, habrá que romper algunas protecciones menos fuertes
+    // pero intentamos respetar caballos y pares
+    function isStrongProtected(x){
+      if(x==="C") return true;
+      if(ranks[x]>=2) return true;
+      return false;
+    }
+
+    // 3.a) candidatos obvios: los no keep siguiendo orden
+    for(const r of discardOrder){
+      for(let i=0;i<pool.length;i++){
+        if(pool[i]===r && !keep.has(r)){
+          toDiscard.push(r);
+          pool.splice(i,1);
+          if(toDiscard.length===n) return toDiscard;
+          i--; // adjust index
+        }
+      }
+    }
+    // 3.b) si aún faltan, romper protecciones débiles (no C ni pares)
+    for(const r of discardOrder){
+      for(let i=0;i<pool.length;i++){
+        if(pool[i]===r && !isStrongProtected(r)){
+          toDiscard.push(r);
+          pool.splice(i,1);
+          if(toDiscard.length===n) return toDiscard;
+          i--;
+        }
+      }
+    }
+    // 3.c) último recurso: cualquier cosa excepto caballos
+    for(const r of discardOrder){
+      for(let i=0;i<pool.length;i++){
+        if(pool[i]===r && r!=="C"){
+          toDiscard.push(r);
+          pool.splice(i,1);
+          if(toDiscard.length===n) return toDiscard;
+          i--;
+        }
+      }
+    }
+    // 3.d) si aún no basta y solo hay caballos, pues habrá que tirarlos
+    while(toDiscard.length<n && pool.length){
+      toDiscard.push(pool.pop());
+    }
+    return toDiscard;
+  }
+
+  // Parchear applyDiscardsAndDraw para usar "pdf"
+  const _apply_old = window.applyDiscardsAndDraw;
+  window.applyDiscardsAndDraw = function(hand, deck, n, strategy, lanceTag, roleOpts){
+    if(!n) return hand;
+    let toDiscard = [];
+    if(strategy==="pdf"){
+      toDiscard = chooseDiscardsPDF(hand, n, lanceTag, roleOpts||{});
+    } else if(strategy==="lance"){
+      // usa la heurística previa por lance
+      toDiscard = (_apply_old && _apply_old.name==="applyDiscardsAndDraw" ? null : null); // no podemos llamar al viejo directamente
+      // replicamos mínima lógica aleatoria si no existe viejo
+      if(!toDiscard || !Array.isArray(toDiscard)){
+        const tmp = hand.slice();
+        for(let i=0;i<n;i++){
+          const j=Math.floor(Math.random()*tmp.length);
+          (toDiscard||[]).push(tmp.splice(j,1)[0]);
+        }
+      }
+    } else {
+      // aleatorio
+      const tmp = hand.slice();
+      for(let i=0;i<n;i++){
+        const j=Math.floor(Math.random()*tmp.length);
+        toDiscard.push(tmp.splice(j,1)[0]);
+      }
+    }
+    // quitar seleccionados del hand y "quemarlos" (no vuelven al mazo)
+    toDiscard.forEach(c=>{ const idx = hand.indexOf(c); if(idx>=0) hand.splice(idx,1); });
+    // robar
+    const drawn = (function(){ const arr=[]; for(let i=0;i<n;i++){ if(deck.length===0) break; const j=Math.floor(Math.random()*deck.length); arr.push(deck[j]); deck.splice(j,1); } return arr; })();
+    return hand.concat(drawn);
+  };
+
+  // Hook en teamWins para pasar roleOpts a applyDiscardsAndDraw
+  const _teamWins = window.teamWins;
+  window.teamWins = function(lanceCompare, hand, opts){
+    const iters = opts.iters||20000;
+    const dMine = (opts.discardsMine||[]).slice(0,4).filter(Boolean);
+    const dComp = Math.max(0, Math.min(4, opts.dComp||0));
+    const dOp1  = Math.max(0, Math.min(4, opts.dOp1||0));
+    const dOp2  = Math.max(0, Math.min(4, opts.dOp2||0));
+    const strategy = opts.discardStrategy || "random";
+    const mano = !!opts.mano;
+    const lanceTag = (function(){
+      if(lanceCompare===window.compGrande) return "grande";
+      if(lanceCompare===window.compChica) return "chica";
+      if(lanceCompare===window.compPares) return "pares";
+      return "juego";
+    })();
+
+    // --- Helpers para reparto condicionado ---
+    const draw4Random = (d) => {
+      const h = [];
+      for(let i=0; i<4 && d.length>0; i++) { h.push(d.splice(Math.floor(Math.random()*d.length), 1)[0]); }
+      return h;
+    };
+    const draw4WithCard = (d, rank) => {
+      const idx = d.indexOf(rank);
+      if (idx !== -1 && d.length >= 4) {
+          const hand = [d.splice(idx, 1)[0]];
+          for(let i=0; i<3; i++) { hand.push(d.splice(Math.floor(Math.random()*d.length), 1)[0]); }
+          for (let i = hand.length - 1; i > 0; i--) { // shuffle
+              const j = Math.floor(Math.random() * (i + 1));
+              [hand[i], hand[j]] = [hand[j], hand[i]];
+          }
+          return hand;
+      }
+      return draw4Random(d); // Fallback si no se puede cumplir la condición
+    };
+
+    let wins=0, ties=0;
+    for(let t=0;t<iters;t++){
+      // construir mazo y quemar mis descartes conocidos
+      const ranks = ["R","3","C","S","7","6","5","4","A","2"];
+      const deck=[]; for(const r of ranks){ for(let i=0;i<4;i++) deck.push(r); }
+      const myFinal = hand.slice();
+      myFinal.forEach(c=>{ const idx=deck.indexOf(c); if(idx>=0) deck.splice(idx,1); });
+      dMine.forEach(c=>{ const idx=deck.indexOf(c); if(idx>=0) deck.splice(idx,1); }); // QUEMADAS
+
+      // Repartir cartas. Si un rival tira 3, se asume que guarda una carta fuerte (Rey, o As a chica).
+      const keepCardFor3Discards = lanceTag === 'chica' ? 'A' : 'R';
+      let comp = draw4Random(deck);
+      let op1  = (dOp1 === 3) ? draw4WithCard(deck, keepCardFor3Discards) : draw4Random(deck);
+      let op2  = (dOp2 === 3) ? draw4WithCard(deck, keepCardFor3Discards) : draw4Random(deck);
+      
+      // aplicar descartes (cada uno "quema" sus descartes)
+      const rivalStrategy = opts.applyRivalStrategy || 'pdf';
+      comp = window.applyDiscardsAndDraw(comp, deck, dComp, strategy, lanceTag, {mano:false});
+      op1  = window.applyDiscardsAndDraw(op1 , deck, dOp1 , rivalStrategy,    lanceTag, {mano:false});
+      op2  = window.applyDiscardsAndDraw(op2 , deck, dOp2 , rivalStrategy,    lanceTag, {mano:false});
+
+      // mejores manos de cada pareja
+      const c12 = lanceCompare(comp, myFinal, opts);
+      const topOur = (c12 != null && c12 >= 0) ? comp : myFinal;
+      const r12 = lanceCompare(op1, op2, opts);
+      const topRiv = (r12 != null && r12 >= 0) ? op1 : op2;
+
+      let cmp = lanceCompare(topOur, topRiv, opts);
+      if (cmp===null){ ties++; continue; } // no hay lance de Pares
+      if(cmp===0){ cmp = mano?1:-1; }
+      if(cmp>0) wins++; else if(cmp===0) ties++;
+    }
+    return wins/iters;
+  };
+
+  // ampliar nota con fuentes
+  const note = document.getElementById("mc-note");
+  if(note){
+    const extra = " · estrategia=‘según PDF’ usa reglas: mano busca 31, no tirar caballos, excepción dos reyes+as, evitar 34 con dos sietes, romper tres ases si te descartas. [Fuentes en ayuda]";
+    note.textContent += extra;
+  }
+})();
+</script>
+<script>
+(function(){
+  function updatePill(){
+    const usAm = parseInt((document.getElementById("sc-us-am")?document.getElementById("sc-us-am").value:"0") || "0", 10);
+    const usPi = parseInt(document.getElementById("sc-us-pi")?.value || "0", 10);
+    const thAm = parseInt((document.getElementById("sc-th-am")?document.getElementById("sc-th-am").value:"0") || "0", 10);
+    const thPi = parseInt(document.getElementById("sc-th-pi")?.value || "0", 10);
+    const pill = document.getElementById("sc-summary");
+    if(pill) pill.textContent = `${usAm*5+usPi} – ${thAm*5+thPi} piedras`;
+  }
+  ["sc-us-am","sc-us-pi","sc-th-am","sc-th-pi"].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', updatePill);
+  });
+  updatePill();
+})();
+</script>
+<script>
+(function(){
+  // Override generarRecomendaciones to incluir tanteo sin tocar el resto del código
+  const oldGen = (typeof generarRecomendaciones === 'function') ? generarRecomendaciones : null;
+  window.generarRecomendaciones = function(probs, esMano){
+    // === Tanteo (score) ===
+    function piedras() {
+      const usAm = parseInt((document.getElementById("sc-us-am")?document.getElementById("sc-us-am").value:"0") || "0", 10);
+      const usPi = parseInt(document.getElementById("sc-us-pi")?.value || "0", 10);
+      const thAm = parseInt((document.getElementById("sc-th-am")?document.getElementById("sc-th-am").value:"0") || "0", 10);
+      const thPi = parseInt(document.getElementById("sc-th-pi")?.value || "0", 10);
+      return {us: usAm*5 + usPi, th: thAm*5 + thPi};
+    }
+    const sc = piedras();
+    const pill = document.getElementById("sc-summary");
+    if (pill) pill.textContent = `${sc.us} – ${sc.th} piedras`;
+
+    // Llama a la versión original para construir las secciones base
+    if (oldGen) oldGen(probs, esMano);
+
+    // Después de que oldGen pinte, añadimos/ajustamos la primera sección (Decisión de MUS)
+    try {
+      const container = document.getElementById("recs");
+      if (!container) return;
+      // Heurísticas adicionales según tanteo
+      const ellosAdentro = sc.th >= 35;
+      const nosotrosAdentro = sc.us >= 35;
+      const vamosMuyDetras = (sc.th - sc.us) >= 10 || sc.th >= 30;
+      const vamosMuyDelante = (sc.us - sc.th) >= 10;
+
+      // Leer mano actual si está definida
+      let hand = null;
+      if (typeof getManualHand === "function") hand = getManualHand();
+      const pInfo = hand ? paresInfo(hand) : {type:"nada"};
+      const jInfo = hand ? juegoInfo(hand) : {hasJuego:false,is31:false};
+
+      // Encontrar sección "Decisión de MUS"
+      const cards = container.querySelectorAll('.card .title');
+      let idx = -1;
+      cards.forEach((t,i)=>{ if(t.textContent.trim()==="Decisión de MUS") idx=i; });
+      if (idx>=0){
+        const card = container.querySelectorAll('.card')[idx];
+        const adviseEl = card.querySelector('.advise');
+        const reasonEl = card.querySelector('.reason');
+        function setAdv(txt, why){ if(adviseEl) adviseEl.textContent = txt; if(reasonEl) reasonEl.textContent = why; }
+
+        // Reglas de tanteo que pueden reforzar o corregir la decisión base
+        if (esMano && jInfo.hasJuego && pInfo.type!=="nada"){
+          setAdv("Corta: NO HAY MUS", "Mano + juego + pares: corta y manda.");
+        } else if (esMano && jInfo.is31){
+          setAdv("Corta: NO HAY MUS", "Mano con 31: busca cobrar juego ya.");
+        } else if (vamosMuyDelante && pInfo.type==="duples"){
+          setAdv("Corta: NO HAY MUS", "Duples con ventaja de tanteo: evita regalar descartes.");
+        } else if (vamosMuyDetras && !jInfo.is31 && pInfo.type==="nada"){
+          // deja la decisión como estaba, pero refuerza pedir mus
+          setAdv("Pide MUS", "Vas por detrás: mejora la mano o prepara órdagos si cortan.");
+        }
+
+        // Mensajes contextuales
+        if (reasonEl){
+          if (ellosAdentro && !nosotrosAdentro){
+            reasonEl.textContent += " | Ojo: ellos ≥35 (adentro). Evita regalar piedras de pase; corta solo si llevas juego/pares fuertes.";
+          } else if (nosotrosAdentro){
+            reasonEl.textContent += " | Estás ≥35: sé conservador con envites que te expongan a un órdago perdedor.";
+          }
+        }
+      }
+    } catch(e){ /* no-op */ }
+  };
+})();
+</script>
+<script>
+(function(){
+  const oldGen = (typeof generarRecomendaciones === 'function') ? generarRecomendaciones : null;
+
+  function piedrasFromUI(){
+    const usAm = parseInt((document.getElementById("sc-us-am")?document.getElementById("sc-us-am").value:"0") || "0", 10);
+    const usPi = parseInt(document.getElementById("sc-us-pi")?.value || "0", 10);
+    const thAm = parseInt((document.getElementById("sc-th-am")?document.getElementById("sc-th-am").value:"0") || "0", 10);
+    const thPi = parseInt(document.getElementById("sc-th-pi")?.value || "0", 10);
+    return {us: usAm*5 + usPi, th: thAm*5 + thPi};
+  }
+
+  function whoCuts(){ return (document.getElementById("sc-who")?document.getElementById("sc-who").value:"") || "none"; }
+
+  function adviseByProb(prob, esMano, sc, who){
+    // Base thresholds
+    let TH_ORDAGO = 0.85, TH_FUERTE = 0.70, TH_ENVIDA = 0.60;
+    // Mano un pelín más agresiva
+    if (esMano) { TH_ORDAGO -= 0.02; TH_FUERTE -= 0.02; TH_ENVIDA -= 0.02; }
+
+    // Ajustes por quién corta y tanteo
+    const advDiff = sc.us - sc.th; // positivo si vamos por delante
+    if (who === 'them'){
+      // Si cortan ellos, asumimos mano fuerte => sube umbrales
+      let bump = 0.05;
+      if (sc.th >= 35) bump += 0.05;
+      if ((sc.th - sc.us) >= 10) bump += 0.05;
+      bump = Math.min(bump, 0.15);
+      TH_ORDAGO += bump; TH_FUERTE += bump; TH_ENVIDA += bump;
+    } else if (who === 'us'){
+      // Si cortamos nosotros, queremos cerrar: baja umbrales si vamos por delante
+      let drop = 0.02;
+      if (sc.us >= 35) drop += 0.03;
+      if (advDiff >= 10) drop += 0.03;
+      drop = Math.min(drop, 0.10);
+      TH_ORDAGO -= drop; TH_FUERTE -= drop; TH_ENVIDA -= drop;
+    }
+
+    // Clamp
+    const clamp = (x)=>Math.max(0.40, Math.min(0.95, x));
+    TH_ORDAGO = clamp(TH_ORDAGO); TH_FUERTE = clamp(TH_FUERTE); TH_ENVIDA = clamp(TH_ENVIDA);
+
+    if (prob >= TH_ORDAGO) return { advise: "Órdago", reason: `Prob. ${(prob*100).toFixed(0)}% (umbral ${Math.round(TH_ORDAGO*100)}%).` };
+    if (prob >= TH_FUERTE) return { advise: "Envida fuerte", reason: `Prob. ${(prob*100).toFixed(0)}% (umbral ${Math.round(TH_FUERTE*100)}%).` };
+    if (prob >= TH_ENVIDA) return { advise: "Envida", reason: `Prob. ${(prob*100).toFixed(0)}% (umbral ${Math.round(TH_ENVIDA*100)}%).` };
+    return { advise: "Pasa", reason: `Prob. ${(prob*100).toFixed(0)}% (< ${Math.round(TH_ENVIDA*100)}%).` };
+  }
+
+  window.generarRecomendaciones = function(probs, esMano){
+    // Primero, render base
+    if (oldGen) oldGen(probs, esMano);
+
+    const sc = piedrasFromUI();
+    const who = whoCuts();
+
+    // Ajusta "Decisión de MUS" (ya se ajustaba con tanteo en otra override)
+    try {
+      const container = document.getElementById("recs");
+      if (!container) return;
+      const cards = container.querySelectorAll('.card');
+      const titles = container.querySelectorAll('.card .title');
+      const map = {};
+      titles.forEach((t,i)=>{ map[t.textContent.trim()] = {i, card: cards[i]}; });
+
+      // Añadir badge de contexto
+      const header = container.querySelector('.card .title');
+      if (header){
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.style.marginLeft = '8px';
+        badge.textContent = who === 'them' ? 'CORTAN ELLOS' : (who === 'us' ? 'CORTAMOS' : 'SIN CORTE');
+        header.appendChild(badge);
+      }
+
+      // Reescribir consejos por lance con umbrales ajustados
+      const lances = [
+        ["Grande", probs.grande],
+        ["Chica",  probs.chica],
+        ["Pares",  probs.pares],
+        ["Juego / Punto", probs.juego]
+      ];
+      lances.forEach(([name, p])=>{
+        const entry = map[name];
+        if (!entry) return;
+        const advice = adviseByProb(p, esMano, sc, who);
+        // Excepciones básicas
+        if (name==="Pares" && p < 0.01) advice.advise = "Pasa";
+        if (name.startsWith("Juego") && p < 0.01) advice.advise = "Pasa";
+
+        const adviseEl = entry.card.querySelector('.advise');
+        const reasonEl = entry.card.querySelector('.reason');
+        if (adviseEl) adviseEl.textContent = advice.advise;
+        if (reasonEl) reasonEl.textContent = advice.reason + (who==='them' ? " Rival ha cortado: asume fuerza." : who==='us' ? " Buscamos cerrar sin regalar desc." : "");
+      });
+    } catch(e){ /* no-op */ }
+  };
+})();
+</script>
+<script>
+(function(){
+  const ORDER_G = ["R","3","C","S","7","6","5","4","A","2"];
+  const ORDER_C = ORDER_G.slice().reverse();
+  const JVAL = {"R":10,"3":10,"C":10,"S":10,"7":7,"6":6,"5":5,"4":4,"A":1,"2":1};
+
+  function juegoSum(h){ return h.reduce((a,c)=>a+(JVAL[c]||0),0); }
+  function countRanks(h){ const m={}; h.forEach(c=>m[c]=(m[c]||0)+1); return m; }
+  function sortByOrder(h, order){ return h.slice().sort((a,b)=>order.indexOf(a)-order.indexOf(b)); }
+
+  // Scorers: valor de mano por lance (más alto = mejor)
+  function scoreGrande(h){ const s=sortByOrder(h,ORDER_G); const w=[1e6,1e4,1e2,1]; return s.reduce((a,c,i)=>a+(10-ORDER_G.indexOf(c))*w[i],0); }
+  function scoreChica(h){ const s=sortByOrder(h,ORDER_C); const w=[1e6,1e4,1e2,1]; return s.reduce((a,c,i)=>a+(10-ORDER_C.indexOf(c))*w[i],0); }
+  function scorePares(h){
+    const m=countRanks(h); const counts=Object.values(m).sort((a,b)=>b-a);
+    let code=0, pairRank=99, kick=0;
+    if(counts[0]===2 && counts[1]===2) code=3; else if(counts[0]===3) code=2; else if(counts[0]===2) code=1;
+    if(code>0){ let best=99; for(const k in m){ if(m[k]>=2){ const idx=ORDER_G.indexOf(k); if(idx<best) best=idx; } } pairRank=best; }
+    kick = scoreGrande(h)%100;
+    return code*1e6 + (100-pairRank)*1e3 + kick;
+  }
+  function scoreJuego(h){ const sum=juegoSum(h); const is31=sum===31; const real=is31 && h.filter(x=>x==="7").length===3 && h.some(x=>["R","C","S"].includes(x)); return (sum>=31?1e6:0)+(is31?1e5:0)+(real?1e4:0)+sum; }
+  function strength(lance,h){ if(lance==="grande")return scoreGrande(h); if(lance==="chica")return scoreChica(h); if(lance==="pares")return scorePares(h); return scoreJuego(h); }
+
+  function discardCombos(n){ const out=[], idx=[0,1,2,3]; (function rec(s,k,cur){ if(k===0){out.push(cur.slice()); return;} for(let i=s;i<idx.length;i++) rec(i+1,k-1,cur.concat([idx[i]])); })(0,n,[]); return out; }
+
+  function evAfterDiscard(hand, deck, idxs, lance, trials){
+    const keep = hand.filter((_,i)=>!idxs.includes(i)); let ev=0; const n=idxs.length;
+    for(let t=0;t<trials;t++){
+      const d=deck.slice();
+      const drawn = window.drawN(d, n);
+      ev += strength(lance, keep.concat(drawn));
+    }
+    return ev/trials;
+  }
+
+  // Returns the indices of the best cards to discard for a given n
+  function chooseDiscardsBestN(hand, deck, n, lance, T){
+    if(n<=0) return [];
+    let best=null, bestEV=-Infinity; const combos=discardCombos(n); const trials=T||120;
+    for(const idxs of combos){ const ev=evAfterDiscard(hand, deck, idxs, lance, trials); if(ev>bestEV){bestEV=ev; best=idxs;} }
+    return best;
+  }
+
+  // Tries discarding 0..3 cards and returns the card values for the best action
+  function chooseDiscardsAuto(hand, deck, lance){
+    let bestDiscardIdxs = [];
+    let bestEV = evAfterDiscard(hand, deck, [], lance, 90); // EV of keeping all 4 cards
+
+    for (let n = 1; n <= 3; n++) {
+      const combos = discardCombos(n);
+      for (const idxs of combos) {
+        const currentEV = evAfterDiscard(hand, deck, idxs, lance, 90);
+        if (currentEV > bestEV) {
+          bestEV = currentEV;
+          bestDiscardIdxs = idxs;
+        }
+      }
+    }
+    return bestDiscardIdxs.map(i => hand[i]);
+  }
+
+  // Hook: estrategia "racional"
+  const _apply = window.applyDiscardsAndDraw;
+  window.applyDiscardsAndDraw = function(hand, deck, n, strategy, lanceTag, roleOpts){
+    if (strategy !== "racional") {
+        const numericN = (typeof n === 'number') ? n : 0;
+        return _apply(hand, deck, numericN, strategy, lanceTag, roleOpts);
+    }
+
+    const auto = (n === 'auto' || typeof n !== 'number');
+    const toDiscard = auto ? chooseDiscardsAuto(hand, deck, lanceTag) : (chooseDiscardsBestN(hand, deck, n, lanceTag, 120) || []).map(i => hand[i]);
+
+    const k = toDiscard.length;
+    toDiscard.forEach(c => window.removeOnce(hand, c));
+    const drawn = window.drawN(deck, k);
+    hand.push(...drawn);
+    return hand;
+  };
+
+  // Forzar rivales a usar "racional"
+  const _tw = window.teamWins;
+  window.teamWins = function(lanceCompare, myHand, opts){
+    const finalOpts = { ...opts };
+    // Si la estrategia del usuario es 'racional' y no se ha especificado una para el rival,
+    // se asume que el rival también es 'racional' para simular un juego óptimo.
+    if (finalOpts.discardStrategy === 'racional' && !finalOpts.applyRivalStrategy) {
+      finalOpts.applyRivalStrategy = 'racional';
+    }
+    return _tw(lanceCompare, myHand, finalOpts);
+  };
+  
+  // Add 'racional' to the strategy dropdown
+  const strategySelect = document.getElementById('mc-dstrategy');
+  if (strategySelect && !strategySelect.querySelector('option[value="racional"]')) {
+    const opt = document.createElement('option');
+    opt.value = 'racional';
+    opt.textContent = 'racional (EV)';
+    strategySelect.appendChild(opt);
+  }
+})();
+</script>
+<script>
+(function(){
+  // Decisión MUS básica (mismos umbrales que tu “Decisión de MUS”)
+  function decideMus(probs){
+    const avg = (probs.grande + probs.chica + probs.pares + probs.juego) / 4;
+    if (avg > 0.65 || probs.pares > 0.80 || probs.juego > 0.80) return 'cut'; // NO HAY MUS
+    return 'mus'; // pedir MUS
+  }
+
+  // Mapa “2 Ases -> 2 Reyes” solo para comparar fuerza (tu petición)
+  function mapAasToReyes(hand){
+    const h = hand.slice();
+    let k = 0;
+    for (let i=0;i<h.length;i++){
+      if (h[i] === 'A' && k < 2){ h[i] = 'R'; k++; }
+    }
+    return h;
+  }
+
+  // En corte (NO MUS), el rival con AA se evalúa como RR en Grande/Pares
+  function wrapComparator(base){
+    return function(a,b,opts){
+      const aa = a.filter(x => x==='A').length;
+      const ab = b.filter(x => x==='A').length;
+      const A = (aa >= 2) ? mapAasToReyes(a) : a;
+      const B = (ab >= 2) ? mapAasToReyes(b) : b;
+      return base(A,B,opts);
+    };
+  }
+
+  function fmt(x){ return (x*100).toFixed(1)+'%'; }
+
+  const btn = document.getElementById('mc-mus-bias');
+  if(!btn) return;
+
+  btn.addEventListener('click', function(){
+    // 0) Necesito tu mano actual
+    if (typeof getManualHand !== 'function'){ return; return; }
+    const hand = getManualHand();
+    if (!hand || hand.length !== 4){ return; return; }
+
+    // 1) Monte Carlo neutral para decidir MUS
+    const iters = parseInt(document.getElementById('mc-iters')?.value || '20000', 10);
+    const baseOpts = {
+      use31real: !!document.getElementById('opt31real')?.checked,
+      mano: !!document.getElementById('optMano')?.checked,
+      iters
+    };
+    const pG0 = window.teamWins(window.compGrande, hand, baseOpts);
+    const pC0 = window.teamWins(window.compChica , hand, baseOpts);
+    const pP0 = window.teamWins(window.compPares , hand, baseOpts);
+    const pJ0 = window.teamWins((a,b,o)=>window.compJuego(a,b,o), hand, baseOpts);
+    const probs0 = {grande:pG0, chica:pC0, pares:pP0, juego:pJ0};
+    const decision = decideMus(probs0); // 'mus' | 'cut'
+
+    // 2) Recalcular con SESGO de MUS
+    let opts2 = Object.assign({}, baseOpts);
+    let cmpG = window.compGrande, cmpC = window.compChica, cmpP = window.compPares, cmpJ = (a,b,o)=>window.compJuego(a,b,o);
+
+    if (decision === 'mus'){
+      // MUS: todos descartan “optimizado” (aprox). Ajusta si quieres.
+      opts2.discardsMine = [];      // no quemamos adicionales
+      opts2.dComp = 2; opts2.dOp1 = 2; opts2.dOp2 = 2;
+      opts2.discardStrategy = 'pdf';      // usa tus reglas “según PDF”
+      opts2.applyRivalStrategy = 'pdf';   // rivales también
+    } else {
+      // NO HAY MUS: nadie roba; rivales con AA cuentan como RR en Grande/Pares
+      opts2.dComp = 0; opts2.dOp1 = 0; opts2.dOp2 = 0;
+      opts2.discardStrategy = 'random';
+      opts2.applyRivalStrategy = 'pdf';
+      cmpG = wrapComparator(window.compGrande);
+      cmpP = wrapComparator(window.compPares);
+      // Chica/Juego se dejan neutros
+    }
+
+    const pG = window.teamWins(cmpG, hand, opts2);
+    const pC = window.teamWins(cmpC, hand, opts2);
+    const pP = window.teamWins(cmpP, hand, opts2);
+    const pJ = window.teamWins(cmpJ, hand, opts2);
+
+    // 3) Pintar
+    document.getElementById('mc-grande').textContent = fmt(pG);
+    document.getElementById('mc-chica').textContent  = fmt(pC);
+    document.getElementById('mc-pares').textContent  = fmt(pP);
+    document.getElementById('mc-juego').textContent  = fmt(pJ);
+
+    const note = document.getElementById('mc-note');
+    if (note){
+      note.textContent = `[Inferencia] Sesgo MUS aplicado · decisión=${decision.toUpperCase()} · ` +
+        (decision==='mus' ? `descartes comp/op1/op2=2/2/2, estrategia=PDF` :
+                            `corte sin robos; rivales AA→RR en Grande/Pares`) +
+        ` · iters=${opts2.iters.toLocaleString()}.`;
+    }
+
+    // 4) Regenerar recomendaciones con las nuevas probabilidades
+    if (typeof window.generarRecomendaciones === 'function'){
+      window.generarRecomendaciones({grande:pG, chica:pC, pares:pP, juego:pJ}, !!opts2.mano);
+    }
+  });
+})();
+</script>
+<div class="wrap">
+<div class="wrap">
+</div>
+</div>
+<script>
+(function(){
+  // === Utilidades (coherentes con tu simulador) ===
+  const RANKS = ["R","3","C","S","7","6","5","4","A","2"]; // grande
+  const ORDER_GRANDE = (typeof window.ORDER_GRANDE !== "undefined") ? window.ORDER_GRANDE : RANKS.slice();
+  const JUEGO_VALUE = (typeof window.JUEGO_VALUE !== "undefined") ? window.JUEGO_VALUE : {R:10, 3:10, C:10, S:10, 7:7, 6:6, 5:5, 4:4, A:1, 2:1};
+  const isFigura = c => (c==="R"||c==="3"||c==="C"||c==="S");
+  const byGrande = (a,b)=> ORDER_GRANDE.indexOf(a) - ORDER_GRANDE.indexOf(b);
+  const count = hand => hand.reduce((m,c)=>(m[c]=(m[c]||0)+1,m),{});
+  const sumJuego = hand => hand.reduce((s,c)=> s + (JUEGO_VALUE[c]||0), 0);
+
+  function pairsPresent(hand){
+    const m = count(hand);
+    const pairs = Object.keys(m).filter(k=>m[k]>=2).sort(byGrande);
+    return pairs; // de mayor a menor según ORDER_GRANDE
+  }
+
+  // === Núcleo: escoger 2 a conservar desde 4 ===
+  function elegirDos(hand, opts={}){
+    // hand: array con 4 letras. Devuelve {keep:[c1,c2], why:[...]}.
+    const mano = !!opts.mano;
+    const sorted = hand.slice().sort(byGrande); // R,3,C,S,...
+    const m = count(sorted);
+    const why = [];
+
+    // Regla 0: no duplicar entradas/asegurar 4 cartas válidas
+    if(sorted.length!==4 || sorted.some(c=>!RANKS.includes(c))){
+      return {keep:[], why:["Entrada inválida."], warn:true};
+    }
+
+    // Regla 1 — si hay dos pares, quedarse el par más alto.
+    const keys = Object.keys(m).sort(byGrande);
+    const hayDosPares = keys.filter(k=>m[k]===2).length===2;
+    if(hayDosPares){
+      // mayor primero (menor índice en ORDER_GRANDE)
+      const mejor = keys[0];
+      why.push("Dos pares: priorizo el par más alto para Grande y Pares.");
+      if(mejor==="7"){
+        // excepción de los sietes: valorar 31 si hay figura
+        const fig = sorted.find(isFigura);
+        if(fig){
+          why.push("Excepción 7-7: con figura, prefiero 7 + figura para perseguir 31 y evitar caer en 34.");
+          return {keep:["7", fig], why};
+        }
+      }
+      return {keep:[mejor, mejor], why};
+    }
+
+    // Regla 2 — si hay un par único
+    const parUnico = keys.find(k=>m[k]>=2);
+    if(parUnico){
+      if(parUnico==="7"){
+        // Evitar 34 cuando se puede buscar 31 con figura
+        const fig = sorted.find(isFigura);
+        if(fig){
+          why.push("Par de sietes con figura: cambio a 7 + figura para perseguir 31 y no atascarme en 34.");
+          return {keep:["7", fig], why};
+        }
+      }
+      why.push("Par presente: conservar el par (más valor en Pares/Grande).");
+      return {keep:[parUnico, parUnico], why};
+    }
+
+    // Regla 3 — sin pares
+    // 3a) si hay al menos un 7 y alguna figura, conservar 7 + figura (camino a 31)
+    const hay7 = sorted.includes("7");
+    const figs = sorted.filter(isFigura);
+    if(hay7 && figs.length){
+      const mejorF = figs[0];
+      why.push("Sin pares: con 7 + figura se optimiza la ruta a 31 (mano debe buscar 31) y se mantiene fuerza a Grande.");
+      return {keep:["7", mejorF], why};
+    }
+
+    // 3b) En otro caso, conservar las dos más altas por Grande, priorizando no soltar C (caballo)
+    const ordenadas = sorted.slice();
+    // preferencia: nunca soltar C si queda empate
+    if(ordenadas.includes("C")){
+      // asegurar que C queda dentro de las 2 altas
+      ordenadas.sort(byGrande);
+      const top2 = [ordenadas[0], ordenadas[1]]; // ya son las más altas
+      if(!top2.includes("C")){
+        // sustituir la 2ª por C
+        top2[1] = "C";
+        top2.sort(byGrande);
+      }
+      why.push("Sin pares: conservo dos altas para Grande, priorizando no tirar caballos.");
+      return {keep:top2, why};
+    }
+
+    // 3c) fallback general
+    const top2 = sorted.slice(0,2);
+    why.push("Sin pares: conservo las dos más altas por Grande.");
+    return {keep:top2, why};
+  }
+
+  // Exponer la función para que tu simulador pueda usarla también
+  window.asumirRetencionDesdeCuatro = function(hand, opts){
+    return elegirDos(hand, opts || {});
+  };
+
+  // === UI ===
+  const selIds = ["ld-c1","ld-c2","ld-c3","ld-c4"]; selIds.forEach(id=>{
+    const s = document.getElementById(id); if(!s) return;
+    RANKS.forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; s.appendChild(o); });
+    // valor inicial variado para facilidad
+    const idx = selIds.indexOf(id);
+    s.value = RANKS[(idx*2)%RANKS.length];
+  });
+
+  document.getElementById('ld-run').addEventListener('click', ()=>{
+    const hand = selIds.map(id=>document.getElementById(id).value);
+    const mano = document.getElementById('ld-mano').checked;
+    const {keep, why, warn} = elegirDos(hand, {mano});
+    const out = document.getElementById('ld-out');
+    if(warn){ out.textContent = "⚠️ Entrada inválida."; return; }
+    // Explicación amigable
+    const otras = hand.filter((c,i)=> !(keep.includes(c) && keep.indexOf(c)===i) );
+    out.innerHTML = "<strong>Me quedo con:</strong> " + keep.join(" · ") +
+      (mano?" <em>(siendo mano)</em>":"") + "\n" +
+      "<strong>Descarto:</strong> " + otras.join(" · ") + "\n\n" +
+      "<strong>Por qué:</strong>\n- " + why.join("\n- ") +
+      "\n\n<small>Reglas usadas: ‘buscar 31’, ‘no tirar caballos’, 8 reyes (3s como reyes), y excepción de 7-7 para evitar 34 cuando hay figura.</small>";
+  });
+})();
+</script>
+<script>
+(function(){
+  // Helpers already present elsewhere; define minimal fallbacks
+  const RANKS = ["A","2","3","4","5","6","7","S","C","R"];
+  function getVal(id){ var el=document.getElementById(id); return el?el.value:""; }
+  function setText(id, txt){ var el=document.getElementById(id); if(el) el.textContent = txt; }
+  function html(id, txt){ var el=document.getElementById(id); if(el) el.innerHTML = txt; }
+  function handFromSimulator(){
+    const ids = ["mc-c1","mc-c2","mc-c3","mc-c4"];
+    const vals = ids.map(getVal).filter(Boolean);
+    if(vals.length!==4) return null;
+    return vals;
+  }
+  function count(h){ const m={}; h.forEach(c=>m[c]=(m[c]||0)+1); return m; }
+  function sameMultiset(h, arr){ const m=count(h), n=count(arr); const keys=new Set([...Object.keys(m), ...Object.keys(n)]);
+    for(const k of keys){ if((m[k]||0)!==(n[k]||0)) return false; } return true; }
+  function includesAll(h, arr){ const m=count(h), n=count(arr); for(const k in n){ if((m[k]||0)<n[k]) return false; } return true; }
+  function stones(){ // read tanteo selects already in the page
+    function gv(id){ var el=document.getElementById(id); return el?parseInt(el.value||"0",10):0; }
+    const us = gv("sc-us-am")*5 + gv("sc-us-pi");
+    const th = gv("sc-th-am")*5 + gv("sc-th-pi");
+    return {us, th};
+  }
+  function nearExit(){ const sc=stones(); return {us: sc.us>=38, th: sc.th>=38}; } // ~1-2 piedras
+  function setupToggle(spanId, inputEl, labelYes, labelNo){
+    const span = document.getElementById(spanId); if(!span) return;
+    const label = span.querySelector('.label');
+    function render(){ if(inputEl.checked){ span.classList.add('on'); span.classList.remove('off'); label.textContent = labelYes; } else { span.classList.add('off'); span.classList.remove('on'); label.textContent = labelNo; } }
+    span.addEventListener('click', ()=>{ inputEl.checked = !inputEl.checked; render(); });
+    render();
+  }
+  // Local toggle for mano (independiente del general para no interferir al simulador)
+  (function(){ var el=document.getElementById("optMano2"); if(!el) return; setupToggle('tgMano2', el, 'Soy mano: SÍ', 'Soy mano: NO'); })();
+
+  // === Motor de recomendación de descarte (reglas de Gil) ===
+  function recommendDiscardGil(hand, ctx){
+    // ctx: {mano:boolean, objetivo:'juego'|'pares', round:0|1, nearUs:boolean, nearTh:boolean}
+    // Devuelve {keep:[], discard:[], notas:[...]}
+    const h = hand.slice().sort();
+    const c = count(h);
+    const notas = [];
+    function keepCards(k){ // compute discard as complement
+      const rem = hand.slice();
+      k.forEach(x=>{ const i=rem.indexOf(x); if(i>=0) rem.splice(i,1); });
+      return {keep:k.slice(), discard:rem, notas};
+    }
+
+    // ——— Casos explícitos del libro ———
+    // 1) RC54
+    if (sameMultiset(h, ["R","C","5","4"])) {
+      if (ctx.mano || ctx.objetivo==="juego") { notas.push("RC54 → quedarte R+C de mano/si vas a Juego."); return keepCards(["R","C"]); }
+      if (ctx.round>=1 || ctx.objetivo==="pares") { notas.push("RC54 → de postre o a Pares, quedarte solo con R."); return keepCards(["R"]); }
+    }
+    // 2) C76A
+    if (sameMultiset(h, ["C","7","6","A"])) {
+      if (ctx.mano || ctx.objetivo==="juego") { notas.push("C76A → quedarte C de mano/para Juego."); return keepCards(["C"]); }
+      else { notas.push("C76A → tirar todas si vas a Pares."); return keepCards([]); }
+    }
+    // 3) A456
+    if (sameMultiset(h, ["A","4","5","6"])) {
+      if (!ctx.mano && ctx.round>=1) { notas.push("A456 → de postre y tras descartes, quedarte A."); return keepCards(["A"]); }
+      else { notas.push("A456 → tirar todo si buscas Juego."); return keepCards([]); }
+    }
+    // 4) AA67
+    if (sameMultiset(h, ["A","A","6","7"])) {
+      if (!ctx.mano || ctx.objetivo==="pares" || ctx.round>=1) { notas.push("AA67 → quedarte AA si vas a Pares/Chica o tras varios descartes."); return keepCards(["A","A"]); }
+      else { notas.push("AA67 → tirar todo si priorizas Juego desde mano."); return keepCards([]); }
+    }
+    // 5) 7764
+    if (sameMultiset(h, ["7","7","6","4"])) {
+      if (!ctx.mano || ctx.objetivo==="pares") { notas.push("7764 → quedarte 77 si no eres mano / vas a Pares."); return keepCards(["7","7"]); }
+      else { notas.push("7764 → tirar todo de mano si vas a Juego."); return keepCards([]); }
+    }
+    // 6) R77A
+    if (sameMultiset(h, ["R","7","7","A"])) {
+      if (ctx.mano) { notas.push("R77A → de mano, quedarte solo R."); return keepCards(["R"]); }
+      else { notas.push("R77A → no mano, quedarte R+77."); return keepCards(["R","7","7"]); }
+    }
+    // 7) CC6A (o SS6A)
+    if (sameMultiset(h, ["C","C","6","A"]) || sameMultiset(h, ["S","S","6","A"])) {
+      notas.push("CC6A/SS6A → quedarte la pareja de figuras.");
+      if ((c["C"]||0)>=2) return keepCards(["C","C"]); if ((c["S"]||0)>=2) return keepCards(["S","S"]); 
+    }
+    // 8) R64A → R solo
+    if (sameMultiset(h, ["R","6","4","A"])) {
+      notas.push("R64A → quedarte solo R.");
+      return keepCards(["R"]);
+    }
+    // 9) R vs R+AA (cualquier cuarta)
+    if ((c["R"]||0)>=1 && (c["A"]||0)>=2) {
+      if (!ctx.mano && (ctx.objetivo==="pares" || ctx.round>=1)) { notas.push("R+AA → de postre / 2º descarte y a Pares."); return keepCards(["R","A","A"]); }
+      else { notas.push("R vs R+AA → prioriza R solo si vas a Juego o eres mano."); return keepCards(["R"]); }
+    }
+    // 10) RR vs RR+C
+    if ((c["R"]||0)>=2) {
+      if ((c["C"]||0)>=1) {
+        if (ctx.mano && ctx.objetivo==="juego") { notas.push("RR+C de mano si vas a Juego."); return keepCards(["R","R","C"]); }
+        else { notas.push("RR+C → a Pares/si no eres mano, conserva RR."); return keepCards(["R","R"]); }
+      } else {
+        // RR con otros
+        if (ctx.mano && ctx.objetivo==="juego" && (c["A"]||0)>=1 && (ctx.nearUs)) { notas.push("RR+A de mano a 1–2 piedras."); return keepCards(["R","R","A"]); }
+        else { notas.push("RR → estándar: conserva RR."); return keepCards(["R","R"]); }
+      }
+    }
+    // 11) RC4A (R vs RC)
+    if (sameMultiset(h, ["R","C","4","A"])) {
+      if (ctx.mano || ctx.objetivo==="juego") { notas.push("RC4A → de mano, quedarte RC."); return keepCards(["R","C"]); }
+      else { notas.push("RC4A → de postre/a Pares, quedarte R."); return keepCards(["R"]); }
+    }
+    // 12) RC4A (RC vs RC+A) — solo si urge 31
+    if (sameMultiset(h, ["R","C","4","A"])) {
+      if (ctx.mano && ctx.nearUs) { notas.push("RC+A de mano si te faltan 1–2 piedras (buscar 31)."); return keepCards(["R","C","A"]); }
+    }
+    // 14) CC4A
+    if (sameMultiset(h, ["C","C","4","A"]) || sameMultiset(h, ["S","S","4","A"])) {
+      if (ctx.mano && ctx.nearUs) { notas.push("CC+A de mano si te faltan 1–2 piedras."); return keepCards([h[0], h[1], "A"]); }
+      else { notas.push("CC4A → quedarte la pareja (CC/SS)."); return keepCards([h[0], h[1]]); }
+    }
+    // 15) RR4A
+    if (sameMultiset(h, ["R","R","4","A"])) {
+      if (ctx.mano && ctx.nearUs) { notas.push("RR+A de mano si te faltan 1–2 piedras."); return keepCards(["R","R","A"]); }
+      else { notas.push("RR4A → quedarte RR."); return keepCards(["R","R"]); }
+    }
+    // 16) R764
+    if (sameMultiset(h, ["R","7","6","4"])) {
+      if (ctx.mano && ctx.nearUs) { notas.push("R764 → a 21 de mano si urge 31 (R+7+4)."); return keepCards(["R","7","4"]); }
+      else { notas.push("R764 → quedarte R solo."); return keepCards(["R"]); }
+    }
+    // 13) RCC4 — rey y dos caballos
+    if ((c["R"]||0)>=1 && (c["C"]||0)>=2) {
+      if (ctx.objetivo==="pares" && !ctx.mano) { notas.push("RCC4 → si priorizas pares altos, puedes quedarte R solo."); return keepCards(["R"]); }
+      else { notas.push("RCC4 → quedarte R+CC (Juego 100% y Pares 100%)."); return keepCards(["R","C","C"]); }
+    }
+    // Default heurístico si no coincide ningún patrón
+    if (ctx.objetivo==="juego"){
+      // Conservar figuras (R,C,S,3) y 7; priorizar dos o tres cartas
+      const keep = []; const order=["R","C","S","3","7","6","5","4","A","2"];
+      for(const r of order){ for(let i=0;i<(c[r]||0); i++){ if(keep.length<3) keep.push(r); } }
+      notas.push("Heurístico: prioriza 31 conservando figuras/7.");
+      return keepCards(keep.slice(0, 4-ctx.n));
+    }else{
+      // Pares: conserva pareja si existe, si no R o figura + candidata a pareja
+      if ((c["R"]||0)>=2) { notas.push("Heurístico: conserva RR."); return keepCards(["R","R"]); }
+      if ((c["C"]||0)>=2) { notas.push("Heurístico: conserva CC."); return keepCards(["C","C"]); }
+      if ((c["S"]||0)>=2) { notas.push("Heurístico: conserva SS."); return keepCards(["S","S"]); }
+      // sin pareja, conserva R o C y otra alta
+      const keep=[]; ["R","C","S","7","6"].forEach(r=>{ for(let i=0;i<(c[r]||0)&&keep.length<2;i++) keep.push(r); });
+      notas.push("Heurístico: sin pareja, conserva figura(s) para formar par.");
+      return keepCards(keep.slice(0, 4-ctx.n));
+    }
+  }
+
+  // Exponer para otras partes
+  window.recommendDiscardGil = recommendDiscardGil;
+
+  // Integración con "estrategia=pdf": si hay patrón explícito y el tamaño encaja, úsalo.
+  const oldApply = window.applyDiscardsAndDraw || function(hand, deck, n){ for(let i=0;i<n && deck.length;i++){ const j=Math.floor(Math.random()*deck.length); hand.push(deck.splice(j,1)[0]); } return hand; };
+  window.applyDiscardsAndDraw = function(hand, deck, n, strategy, lanceTag, roleOpts){
+    if (strategy === "pdf") {
+      try{
+        const ctx = roleOpts || {};
+        // estimar objetivo por lance
+        ctx.objetivo = (lanceTag === "pares") ? "pares" : "juego";
+        ctx.n = n;
+        // leer tanteo para "near exit"
+        const scElA=document.getElementById("sc-us-am"), scElB=document.getElementById("sc-us-pi"), scElC=document.getElementById("sc-th-am"), scElD=document.getElementById("sc-th-pi");
+        function gv(el){ return el?parseInt(el.value||"0",10):0; }
+        const us = gv(scElA)*5 + gv(scElB);
+        const th = gv(scElC)*5 + gv(scElD);
+        ctx.nearUs = us>=38;
+        ctx.nearTh = th>=38;
+        // asumimos rivales no mano por defecto
+        ctx.mano = !!ctx.mano;
+        const rec = recommendDiscardGil(hand, ctx);
+        if (rec && Array.isArray(rec.keep)) {
+          // calcular descartes exactos como complemento a keep, ajustando al tamaño n
+          const toDiscard = hand.slice();
+          const keepCopy = rec.keep.slice(0, Math.min(rec.keep.length, 4-n));
+          // si keep es más largo de lo debido, recortamos por el final
+          keepCopy.forEach(k=>{ const i=toDiscard.indexOf(k); if(i>=0) toDiscard.splice(i,1); });
+          // si aún hay que tirar más, tiramos los más bajos
+          while (toDiscard.length > n) {
+            // devolvemos una carta para mantenerla (preferir altas)
+            const lowIdx = toDiscard.findIndex(x=>["A","2","4","5","6","7"].includes(x));
+            if (lowIdx>=0) { toDiscard.splice(lowIdx,1); } else { toDiscard.pop(); }
+          }
+          // ejecutar descarte
+          toDiscard.forEach(c=>{ const i=hand.indexOf(c); if(i>=0) hand.splice(i,1); });
+          // robar n
+          for(let i=0;i<n && deck.length;i++){ const j=Math.floor(Math.random()*deck.length); hand.push(deck.splice(j,1)[0]); }
+          return hand;
+        }
+      }catch(e){ /* fallback abajo */ }
+    }
+    // Fallback al comportamiento anterior
+    return oldApply(hand, deck, n, strategy, lanceTag, roleOpts);
+  };
+
+  // Botón UI
+  const btn = document.getElementById("btn-gil-reco");
+  if (btn){
+    btn.addEventListener("click", ()=>{
+      const hand = handFromSimulator();
+      if(!hand){ return; return; }
+      const ctx = {
+        mano: !!document.getElementById("optMano2")?.checked,
+        objetivo: document.getElementById("gil-objetivo")?.value || "juego",
+        round: parseInt(document.getElementById("gil-round")?.value || "0", 10),
+        n: 2
+      };
+      const sc = stones(); ctx.nearUs = sc.us>=38; ctx.nearTh = sc.th>=38;
+      const rec = recommendDiscardGil(hand, ctx);
+      const out = document.getElementById("gil-out");
+      if(rec){
+        out.innerHTML = '<div class="row"><div><span class="tag">Conservar</span></div><div class="mono">'+(rec.keep.join(" ")||"—")+'</div></div>' +
+                        '<div class="row"><div><span class="tag">Tirar</span></div><div class="mono">'+(rec.discard.join(" ")||"—")+'</div></div>' +
+                        (rec.notas.length? '<div class="tip" style="margin-top:6px">'+rec.notas.join(" · ")+'</div>' : '');
+      }else{
+        out.textContent = "Sin recomendación explícita. Usa heurísticos.";
+      }
+    });
+  }
+})();
+</script>
+<script>
+(function(){
+  function thresholdPct(E){ return 0.5*(1-1/E); } // B/A = 0.5*(1 - 1/E)
+  const examples = {
+    grande: { "2": "C 6 6 6", "5": "R A A A" },
+    chica:  { "2": "4 7 7 7", "5": "A R R R" }
+  };
+  function fmtPct(x){ return (x*100).toFixed(1) + "%"; }
+  const btn = document.getElementById("qm-calc");
+  if(btn){
+    btn.addEventListener("click", ()=>{
+      const lance = document.getElementById("qm-lance").value;
+      const ap = document.getElementById("qm-apuesta").value;
+      const thr = thresholdPct(parseInt(ap,10));
+      const ex = examples[lance][ap] || "—";
+      const out = document.getElementById("qm-out");
+      out.innerHTML = "<div class='row'><div><span class='tag'>Umbral de querer</span></div><div>"+fmtPct(thr)+"</div></div>" +
+                      "<div class='row'><div><span class='tag'>Ejemplo del libro</span></div><div>"+ex+"</div></div>" +
+                      "<div class='tip'>Querer si estimas p(win) ≥ umbral. Ejemplos: en <b>Grande</b>, con envido (2) basta ≥C666; con cinco (5) basta ≥RAAA. En <b>Chica</b>, con envido (2) basta ≥4777; con cinco (5) basta ≥ARRR.</div>";
+    });
+  }
+})();
+</script>
+<script>
+(function(){
+  // thresholds and example minima per the user's excerpt (Gil)
+  const DATA = {
+    pares: {
+      "1v1": { "2": {thr: 1/6, mano: "AA??", postre: "44??"}, "5": {thr: 1/3, mano: "66??", postre: "66??"} },
+      "vs2": { "2": {thr: 1/7, mano: "77?? (posible errata 'dos seises')", postre: "77??"}, "5": {thr: 4/13, mano: "CC??", postre: "RR??"} },
+      "2v2": { "2": {thr: 1/8, mano: "AA??", postre: "44??"}, "5": {thr: 2/7, mano: "44??", postre: "55??"} },
+      "2v1": { "2": {thr: 1/7, mano: "AA??", postre: "44??"}, "5": {thr: 4/13, mano: "AA??", postre: "44??"} }
+    },
+    juego: {
+      "1v1": { "2": {thr: 1/8, mano: "≥34", postre: "≥35"}, "5": {thr: 2/9, mano: "≥35", postre: "≥36"} },
+      "vs2": { "2": {thr: 1/10, mano: "≥36", postre: "≥37"}, "5": {thr: 1/4, mano: "40", postre: "32"} },
+      "2v2": { "2": {thr: 1/12, mano: "—", postre: "—"}, "5": null },
+      "2v1": { "2": {thr: 1/10, mano: "≥33", postre: "≥34"}, "5": {thr: 1/4, mano: "≥33", postre: "≥34"} }
+    }
+  ,
+    punto: {
+      "todos": { "2": {thr: 1/6, mano: "≥18", postre: "≥19"}, "5": {thr: 1/3, mano: "21–22", postre: "≥22"} }
+    }
+  };
+  function pct(x){ return (x*100).toFixed(2) + "%"; }
+  const btn = document.getElementById("qpj-calc");
+  if(btn){
+    btn.addEventListener("click", ()=>{
+      const lance = document.getElementById("qpj-lance").value;
+      const bet = document.getElementById("qpj-bet").value;
+      const esc = document.getElementById("qpj-esc").value;
+      const out = document.getElementById("qpj-out");
+      const set = (DATA[lance]||{}); const dset = set[esc] || set['todos']; const d = dset ? dset[bet] : null;
+      if(!d){ out.textContent = "Sin datos para ese caso en el libro."; return; }
+      out.innerHTML = "<div class='row'><div><span class='tag'>Umbral p(win)≥</span></div><div>"+pct(d.thr)+"</div></div>" +
+                      "<div class='row'><div><span class='tag'>Ejemplo mano</span></div><div>"+d.mano+"</div></div>" +
+                      "<div class='row'><div><span class='tag'>Ejemplo postre</span></div><div>"+d.postre+"</div></div>" +
+                      "<div class='tip'>Interpretación: si estimas tu prob. de ganar por encima del umbral, matemáticamente conviene <b>querer</b> en este escenario.</div>";
+    });
+  }
+})();
+</script>
+<script>
+(function(){
+  const RMAP = {A:1,"2":2,"3":3,"4":4,"5":5,"6":6,"7":7,S:10,C:10,R:10};
+  const ORDER = ["A","2","3","4","5","6","7","S","C","R"];
+  function getHand(){
+    const ids = ["mc-c1","mc-c2","mc-c3","mc-c4"];
+    const vals = ids.map(id=>document.getElementById(id)?.value).filter(Boolean);
+    return vals.length===4 ? vals : null;
+  }
+  function sortGrande(h){ return h.slice().sort((a,b)=>RMAP[b]-RMAP[a] || ORDER.indexOf(b)-ORDER.indexOf(a)); }
+  function sortChica(h){ return h.slice().sort((a,b)=>RMAP[a]-RMAP[b] || ORDER.indexOf(a)-ORDER.indexOf(b)); }
+  function sumJuego(h){ return h.reduce((s,c)=>s+RMAP[c],0); }
+  function hasPairAtLeast(h, minRank){ const cnt={}; h.forEach(c=>cnt[c]=(cnt[c]||0)+1); const ranks=["R","C","S","7","6","5","4","3","2","A"]; 
+    for(const r of ranks){ if((cnt[r]||0)>=2){ return ranks.indexOf(r) <= ranks.indexOf(minRank); } } return false; }
+  function bestPairsKind(h){ const cnt={}; h.forEach(c=>cnt[c]=(cnt[c]||0)+1); const pairs=Object.entries(cnt).filter(([k,v])=>v>=2).map(([k,v])=>({r:k,n:v}));
+    pairs.sort((x,y)=>ORDER.indexOf(y.r)-ORDER.indexOf(x.r));
+    if(pairs.length>=2 && pairs[0].n>=2 && pairs[1].n>=2) return "duples";
+    if(pairs.length>=1 && pairs[0].n===3) return "medias";
+    if(pairs.length>=1 && pairs[0].n===2) return "simples";
+    return "ninguno";
+  }
+  // Thresholds from the summary table
+  const RULES = {
+    grande: {
+      "2": { hand:["C","6","6","6"], chica:["4","7","7","7"] },
+      "3": { hand:["C","6","S","A"], chica:["4","S","7","R"] },
+      "4": { hand:["C","C","5","5"], chica:["4","4","S","S"] },
+      "5": { hand:["R","A","A","A"], chica:["A","C","R","R"] }
+    },
+    pares: {
+      "1v1": { "2": {mano:"A", postre:"4"},
+               "3": {mano:"4", postre:"5"},
+               "4": {mano:"5", postre:"6"},
+               "5": {mano:"5", postre:"6"} },
+      "vs2": { "2": {mano:"6", postre:null},
+               "3": {mano:null, postre:"S"},
+               "4": {mano:"S", postre:"C"},
+               "5": {mano:"S", postre:"C"} },
+      "2v2": { "2": {mano:"A", postre:"4"},
+               "3": {mano:"4", postre:"4"},
+               "4": {mano:"4", postre:"5"},
+               "5": {mano:"4", postre:"5"} },
+      "2v1": { "2": {mano:"A", postre:"4"},
+               "5": {mano:"A", postre:"4"} }
+    },
+    juego: {
+      "1v1": { "2": {mano:34, postre:35}, "3": {mano:35, postre:36}, "4": {mano:36, postre:36}, "5": {mano:35, postre:36} },
+      "vs2": { "2": {mano:36, postre:37}, "3": {mano:37, postre:40}, "4": {mano:37, postre:40}, "5": {mano:40, postre:32} },
+      "2v2": { "2": {mano:34, postre:35}, "3": {mano:34, postre:35}, "4": {mano:34, postre:35}, "5": {mano:35, postre:36} },
+      "2v1": { "2": {mano:33, postre:34}, "5": {mano:33, postre:34} }
+    },
+    punto: {
+      "todos": { "2": {mano:18, postre:19}, "3": {mano:19, postre:20}, "4": {mano:21, postre:22}, "5": {mano:21, postre:22} }
+    }
+  };
+
+  function setupToggle(spanId, input){ const span=document.getElementById(spanId); if(!span) return;
+    const label=span.querySelector('.label');
+    function render(){ if(input.checked){ span.classList.add('on'); span.classList.remove('off'); label.textContent='Soy mano: SÍ'; } else { span.classList.add('off'); span.classList.remove('on'); label.textContent='Soy mano: NO'; } }
+    span.addEventListener('click', ()=>{ input.checked=!input.checked; render(); });
+    render();
+  }
+  setupToggle('aat-mano-tg', document.getElementById('aat-mano'));
+
+  document.getElementById('aat-decidir')?.addEventListener('click', ()=>{
+    const hand = getHand(); if(!hand){ return; return; }
+    const lance = document.getElementById('aat-lance').value;
+    const bet = document.getElementById('aat-bet').value;
+    const esc = document.getElementById('aat-esc').value;
+    const mano = !!document.getElementById('aat-mano').checked;
+    const out = document.getElementById('aat-out');
+
+    function say(msg, extra){ out.innerHTML = '<div class="row"><div><span class="tag">Decisión</span></div><div>'+msg+'</div></div>' + (extra? '<div class="tip">'+extra+'</div>': ''); }
+
+    if(lance==='grande' || lance==='chica'){
+      const rule = RULES.grande[bet]; if(!rule){ say('Sin regla'); return; }
+      const target = lance==='grande' ? rule.hand : rule.chica;
+      const my = (lance==='grande') ? sortGrande(hand) : sortChica(hand);
+      const cmp = (lance==='grande')
+        ? (a,b)=>{ for(let i=0;i<4;i++){ const d=(RMAP[a[i]]-RMAP[b[i]]) || (ORDER.indexOf(a[i])-ORDER.indexOf(b[i])); if(d) return d>0?1:-1; } return 0; }
+        : (a,b)=>{ for(let i=0;i<4;i++){ const d=(RMAP[a[i]]-RMAP[b[i]]) || (ORDER.indexOf(a[i])-ORDER.indexOf(b[i])); if(d) return d<0?1:-1; } return 0; };
+      const ok = cmp(my, target)>=1 || JSON.stringify(my)===JSON.stringify(target);
+      say(ok? 'QUERER' : 'NO querer', (ok? 'Tu '+lance+' '+my.join('')+' ≥ umbral '+target.join('') : 'Tu '+lance+' '+my.join('')+' < umbral '+target.join('')));
+      return;
+    }
+
+    if(lance==='pares'){
+      const scen = RULES.pares[esc]; if(!scen || !scen[bet]){ say('Sin regla'); return; }
+      const need = (mano? scen[bet].mano : scen[bet].postre);
+      if(!need){ say('Depende. Sin mínimo definido en tabla para este caso.'); return; }
+      const kind = bestPairsKind(hand);
+      const ok = (kind==='duples' || kind==='medias') || hasPairAtLeast(hand, need);
+      say(ok? 'QUERER' : 'NO querer', ok? ('Pares '+kind+' cumplen umbral '+need+need) : ('No alcanzas el par mínimo '+need+need));
+      return;
+    }
+
+    if(lance==='juego'){
+      const scen = RULES.juego[esc]; if(!scen || !scen[bet]){ say('Sin regla'); return; }
+      const need = mano? scen[bet].mano : scen[bet].postre;
+      const total = sumJuego(hand);
+      const ok = total>=need && total>=31;
+      say(ok? 'QUERER' : 'NO querer', 'Total juego='+total+'; umbral='+need);
+      return;
+    }
+
+    if(lance==='punto'){
+      const scen = RULES.punto['todos']; if(!scen || !scen[bet]){ say('Sin regla'); return; }
+      const need = mano? scen[bet].mano : scen[bet].postre;
+      const total = sumJuego(hand);
+      if(total>=31){ say('NO aplica', 'Tienes juego ('+total+').'); return; }
+      const ok = total>=need;
+      say(ok? 'QUERER' : 'NO querer', 'Punto='+total+'; umbral='+need);
+      return;
+    }
+  });
+})();
+</script>
+</body>
+</html>
