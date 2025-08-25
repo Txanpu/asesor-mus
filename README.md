@@ -1,1 +1,1 @@
-Musera jolasteko laguntzaile bat. Oraindik beta
+Musera jolasteko laguntzaile bat. 
